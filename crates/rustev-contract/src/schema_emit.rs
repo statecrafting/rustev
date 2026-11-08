@@ -194,6 +194,36 @@ fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     }
 }
 
+/// The parser refuses every spec 070 member and variant in a
+/// `rustev.extract-rules/1` document (spec 070, 3.1.3), so the version 1
+/// schema keeps the bytes it had before version 2.
+fn extract_rules_v1(v: &mut serde_json::Value) {
+    v["properties"]
+        .as_object_mut()
+        .expect("the program has properties")
+        .remove("month_tables")
+        .expect("the program has a month_tables member");
+    for (ty, added) in [
+        ("ExtractionCondition", &["equals", "one_of"][..]),
+        (
+            "ExtractionValue",
+            &["token_after", "token_matching", "date", "vocabulary_after"][..],
+        ),
+    ] {
+        let variants = v["$defs"][ty]["oneOf"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("{ty} is a oneOf"));
+        let before = variants.len();
+        variants.retain(|v| added.iter().all(|key| v["properties"].get(*key).is_none()));
+        assert_eq!(
+            before - variants.len(),
+            added.len(),
+            "{ty}: version 2 variants"
+        );
+    }
+    prune_defs(v);
+}
+
 /// Keep spec 038 members out of version 1 result schemas.
 fn extraction_v1(v: &mut serde_json::Value, evidence_properties: &str) {
     if let Some(props) = v
@@ -289,7 +319,12 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<crate::generation_result::TextResult>(schema::TEXT_RESULT, None),
         emit::<crate::generation::PromptTemplate>(schema::PROMPT_TEMPLATE, None),
         emit::<crate::generation::GenerateRequest>(schema::GENERATE_REQUEST, None),
-        emit::<crate::extraction_documents::ExtractRules>(schema::EXTRACT_RULES, None),
+        emit_adjusted::<crate::extraction_documents::ExtractRules>(
+            schema::EXTRACT_RULES,
+            None,
+            extract_rules_v1,
+        ),
+        emit::<crate::extraction_documents::ExtractRules>(schema::EXTRACT_RULES_V2, None),
         emit::<crate::extraction_documents::ExtractRequest>(schema::EXTRACT_REQUEST, None),
         emit::<crate::profile::Profile>(schema::PROFILE, None),
         emit::<crate::plan_diff::PlanDiff>(schema::PLAN_DIFF, None),

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use rustev_contract::{
     definition::{Definition, ProvenanceClass, StepBody},
-    extraction::{Extract, ExtractionType, ExtractionVocabulary, Fallback},
+    extraction::{Extract, ExtractionRules, ExtractionType, ExtractionVocabulary, Fallback, Fill},
     extraction_documents::ExtractRules,
     generation::Vocabulary,
 };
@@ -77,6 +77,11 @@ pub(crate) fn resolve(def: &Definition, programs: &[ExtractRules]) -> Result<(),
         let Fallback::Rules(binding) = &e.fallback else {
             continue;
         };
+        required(binding, e).map_err(|err| bad(&step.id, err))?;
+        if binding.fill == Fill::RulesFirst {
+            // Spec 070 increment 1 carries rules_first in the contract only.
+            return Err(bad(&step.id, "rules_first is not supported by this build"));
+        }
         let mut matches = programs
             .iter()
             .filter(|p| format!("{}@{}", p.name, p.version) == binding.rules_program);
@@ -90,6 +95,26 @@ pub(crate) fn resolve(def: &Definition, programs: &[ExtractRules]) -> Result<(),
         ExtractRules::parse(&canonical).map_err(|err| bad(&step.id, err))?;
         program.id().map_err(|err| bad(&step.id, err))?;
         crate::extraction_fallback::bind(program, e).map_err(|err| bad(&step.id, err))?;
+    }
+    Ok(())
+}
+
+/// Spec 070, 3.7.1 and 3.5.6: `required` is allowed only with `rules_first`
+/// and holds 1 to 32 distinct names of declared top-level fields.
+fn required(binding: &ExtractionRules, e: &Extract) -> Result<(), String> {
+    let Some(names) = &binding.required else {
+        return Ok(());
+    };
+    if binding.fill != Fill::RulesFirst {
+        return Err("required is allowed only with fill rules_first".into());
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    if !(1..=32).contains(&names.len())
+        || names
+            .iter()
+            .any(|n| !seen.insert(n.as_str()) || !e.output.fields.iter().any(|f| f.name == *n))
+    {
+        return Err("required must name 1 to 32 distinct declared top-level fields".into());
     }
     Ok(())
 }
@@ -452,8 +477,9 @@ pub(crate) fn bind(
                     .ok_or_else(|| bad(id, "fallback program not supplied"))?;
                 BoundExtractionFallback::Bound {
                     identity: program.id().map_err(|err| bad(id, err))?,
-                    program: program.clone(),
+                    program: Box::new(program.clone()),
                     fill: r.fill.clone(),
+                    required: r.required.clone(),
                 }
             }
         };

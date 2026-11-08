@@ -1248,7 +1248,7 @@ export namespace RustevDefinition1 {
       };
   export type Distributions = "none" | "when_available";
   export type Fallback2 = "none" | ExtractionRules;
-  export type Fill = "request_failure" | "absent_fields";
+  export type Fill = ("request_failure" | "absent_fields") | "rules_first";
   export type NoneOnly = "none";
   export type ExtractionType =
     | {
@@ -1879,6 +1879,12 @@ export namespace RustevDefinition1 {
   }
   export interface ExtractionRules {
     fill: Fill;
+    /**
+     * The fields that must be rules-filled for the request to be skipped,
+     * with `rules_first` only; omitted, every top-level field (spec 070,
+     * 3.7.1). Its bounds are checked when the plan is compiled.
+     */
+    required?: string[] | null;
     rules_program: string;
   }
   export interface ExtractionLimits {
@@ -2624,7 +2630,7 @@ export namespace RustevDefinition2 {
       };
   export type Distributions = "none" | "when_available";
   export type Fallback2 = "none" | ExtractionRules;
-  export type Fill = "request_failure" | "absent_fields";
+  export type Fill = ("request_failure" | "absent_fields") | "rules_first";
   export type NoneOnly = "none";
   export type ExtractionType =
     | {
@@ -3255,6 +3261,12 @@ export namespace RustevDefinition2 {
   }
   export interface ExtractionRules {
     fill: Fill;
+    /**
+     * The fields that must be rules-filled for the request to be skipped,
+     * with `rules_first` only; omitted, every top-level field (spec 070,
+     * 3.7.1). Its bounds are checked when the plan is compiled.
+     */
+    required?: string[] | null;
     rules_program: string;
   }
   export interface ExtractionLimits {
@@ -5286,7 +5298,17 @@ export namespace RustevEvidence2 {
         withheld: {
           reason: AbsenceReason;
         };
+      }
+    | {
+        skipped: {
+          reason: SkipReason;
+        };
       };
+  /**
+   * Why an extract request was skipped; `rules_filled` is the only reason in
+   * this version (spec 070, 3.9.1).
+   */
+  export type SkipReason = "rules_filled";
   export type FieldOrigin =
     | ("generated" | "repaired")
     | {
@@ -7278,6 +7300,164 @@ export namespace RustevExtractRules1 {
   }
 }
 export type RustevExtractRules1 = RustevExtractRules1.RustevExtractRules1;
+
+export namespace RustevExtractRules2 {
+  export type ExtractionValue =
+    | {
+        literal: unknown;
+      }
+    | {
+        integer_after: {
+          max_digits: number;
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        date_iso: {
+          occurrence: number;
+          source: string;
+        };
+      }
+    | {
+        record: {
+          [k: string]: ExtractionValue | undefined;
+        };
+      }
+    | {
+        token_after: {
+          charset: ByteClass[];
+          max_len: number;
+          min_len: number;
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        token_matching: {
+          occurrence?: number | null;
+          shape: ShapeElement[];
+          source: string;
+        };
+      }
+    | {
+        date: {
+          format: DateFormat;
+          months?: string | null;
+          occurrence: number;
+          source: string;
+        };
+      }
+    | {
+        vocabulary_after: {
+          source: string;
+          terms: string[];
+          vocabulary: string;
+        };
+      };
+  /**
+   * A byte class (spec 070, 3.2.3). A `range` is two one-byte strings from
+   * `!` to `~`, `lo <= hi`.
+   */
+  export type ByteClass =
+    | ("upper" | "lower" | "digit")
+    | {
+        /**
+         * @minItems 2
+         * @maxItems 2
+         */
+        range: [string, string];
+      };
+  /**
+   * One element of a `token_matching` shape (spec 070, 3.3.2), matched
+   * possessively.
+   */
+  export type ShapeElement =
+    | "optional_space"
+    | {
+        repeat: {
+          class: ByteClass[];
+          max: number;
+          min: number;
+        };
+      }
+    | {
+        byte: string;
+      };
+  /**
+   * The closed set of declared date formats (spec 070, 3.3.3).
+   */
+  export type DateFormat = "ymd_dash" | "dmy_name" | "mdy_name" | "dmy_slash" | "mdy_slash" | "dmy_dot";
+  export type ExtractionCondition =
+    | "always"
+    | {
+        contains_any: {
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        contains_all: {
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        all: ExtractionCondition[];
+      }
+    | {
+        any: ExtractionCondition[];
+      }
+    | {
+        not: ExtractionCondition;
+      }
+    | {
+        equals: {
+          source: string;
+          value: Scalar;
+        };
+      }
+    | {
+        one_of: {
+          source: string;
+          values: Scalar[];
+        };
+      };
+  /**
+   * An exact input value an `equals` or `one_of` condition compares with
+   * (spec 070, 3.1 and 3.4.3).
+   */
+  export type Scalar = boolean | number | string;
+
+  export interface RustevExtractRules2 {
+    fields: FieldRules[];
+    /**
+     * Month name tables, `rustev.extract-rules/2` only (spec 070, 3.1):
+     * each table has 12 entries, January first, of 1 to 4 names.
+     */
+    month_tables?: {
+      [k: string]: string[][] | undefined;
+    } | null;
+    name: string;
+    schema: "rustev.extract-rules/2";
+    sources: ExtractionSource[];
+    version: string;
+  }
+  export interface FieldRules {
+    field: string;
+    rules: ExtractionRule[];
+  }
+  export interface ExtractionRule {
+    name: string;
+    then: ExtractionValue;
+    when: ExtractionCondition;
+  }
+  export interface ExtractionSource {
+    name: string;
+    ref: string;
+  }
+}
+export type RustevExtractRules2 = RustevExtractRules2.RustevExtractRules2;
 
 export namespace RustevGenerateRequest1 {
   export type GeneratedType =
@@ -9606,7 +9786,7 @@ export namespace RustevPlan2 {
       };
   export type Distributions = "none" | "when_available";
   export type Fallback2 = "none" | ExtractionRules;
-  export type Fill = "request_failure" | "absent_fields";
+  export type Fill = ("request_failure" | "absent_fields") | "rules_first";
   export type NoneOnly = "none";
   export type ExtractionType =
     | {
@@ -10496,6 +10676,12 @@ export namespace RustevPlan2 {
   }
   export interface ExtractionRules {
     fill: Fill;
+    /**
+     * The fields that must be rules-filled for the request to be skipped,
+     * with `rules_first` only; omitted, every top-level field (spec 070,
+     * 3.7.1). Its bounds are checked when the plan is compiled.
+     */
+    required?: string[] | null;
     rules_program: string;
   }
   export interface ExtractionLimits {
@@ -11637,7 +11823,7 @@ export namespace RustevPlan3 {
       };
   export type Distributions = "none" | "when_available";
   export type Fallback2 = "none" | ExtractionRules;
-  export type Fill = "request_failure" | "absent_fields";
+  export type Fill = ("request_failure" | "absent_fields") | "rules_first";
   export type NoneOnly = "none";
   export type ExtractionType =
     | {
@@ -11971,6 +12157,10 @@ export namespace RustevPlan3 {
           fill: Fill;
           identity: ContentDigest;
           program: ExtractRules;
+          /**
+           * As declared, omitted when absent (spec 070, 3.7.7 and 3.10.1).
+           */
+          required?: string[] | null;
         };
       };
   export type ContentDigest = string;
@@ -11995,7 +12185,71 @@ export namespace RustevPlan3 {
         record: {
           [k: string]: ExtractionValue | undefined;
         };
+      }
+    | {
+        token_after: {
+          charset: ByteClass[];
+          max_len: number;
+          min_len: number;
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        token_matching: {
+          occurrence?: number | null;
+          shape: ShapeElement[];
+          source: string;
+        };
+      }
+    | {
+        date: {
+          format: DateFormat;
+          months?: string | null;
+          occurrence: number;
+          source: string;
+        };
+      }
+    | {
+        vocabulary_after: {
+          source: string;
+          terms: string[];
+          vocabulary: string;
+        };
       };
+  /**
+   * A byte class (spec 070, 3.2.3). A `range` is two one-byte strings from
+   * `!` to `~`, `lo <= hi`.
+   */
+  export type ByteClass =
+    | ("upper" | "lower" | "digit")
+    | {
+        /**
+         * @minItems 2
+         * @maxItems 2
+         */
+        range: [string, string];
+      };
+  /**
+   * One element of a `token_matching` shape (spec 070, 3.3.2), matched
+   * possessively.
+   */
+  export type ShapeElement =
+    | "optional_space"
+    | {
+        repeat: {
+          class: ByteClass[];
+          max: number;
+          min: number;
+        };
+      }
+    | {
+        byte: string;
+      };
+  /**
+   * The closed set of declared date formats (spec 070, 3.3.3).
+   */
+  export type DateFormat = "ymd_dash" | "dmy_name" | "mdy_name" | "dmy_slash" | "mdy_slash" | "dmy_dot";
   export type ExtractionCondition =
     | "always"
     | {
@@ -12018,7 +12272,24 @@ export namespace RustevPlan3 {
       }
     | {
         not: ExtractionCondition;
+      }
+    | {
+        equals: {
+          source: string;
+          value: Scalar;
+        };
+      }
+    | {
+        one_of: {
+          source: string;
+          values: Scalar[];
+        };
       };
+  /**
+   * An exact input value an `equals` or `one_of` condition compares with
+   * (spec 070, 3.1 and 3.4.3).
+   */
+  export type Scalar = boolean | number | string;
   export type ResolvedVocabulary =
     | {
         options: string[];
@@ -12744,6 +13015,12 @@ export namespace RustevPlan3 {
   }
   export interface ExtractionRules {
     fill: Fill;
+    /**
+     * The fields that must be rules-filled for the request to be skipped,
+     * with `rules_first` only; omitted, every top-level field (spec 070,
+     * 3.7.1). Its bounds are checked when the plan is compiled.
+     */
+    required?: string[] | null;
     rules_program: string;
   }
   export interface ExtractionLimits {
@@ -13209,6 +13486,13 @@ export namespace RustevPlan3 {
   }
   export interface ExtractRules {
     fields: FieldRules[];
+    /**
+     * Month name tables, `rustev.extract-rules/2` only (spec 070, 3.1):
+     * each table has 12 entries, January first, of 1 to 4 names.
+     */
+    month_tables?: {
+      [k: string]: string[][] | undefined;
+    } | null;
     name: string;
     schema: string;
     sources: ExtractionSource[];
@@ -18809,7 +19093,17 @@ export namespace RustevRun3 {
         withheld: {
           reason: AbsenceReason;
         };
+      }
+    | {
+        skipped: {
+          reason: SkipReason;
+        };
       };
+  /**
+   * Why an extract request was skipped; `rules_filled` is the only reason in
+   * this version (spec 070, 3.9.1).
+   */
+  export type SkipReason = "rules_filled";
   export type FieldOrigin =
     | ("generated" | "repaired")
     | {

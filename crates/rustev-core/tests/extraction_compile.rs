@@ -1429,3 +1429,63 @@ fn ranking_exact_order_sources_refuse_unaccepted_extract_fields() {
         assert!(e.detail.contains(&source));
     }
 }
+
+/// Spec 070, 3.7.1 and 3.5.6: `required` only with `rules_first`, 1 to 32
+/// distinct declared top-level fields; `rules_first` itself is refused by
+/// this build until spec 070's increment 3.
+#[test]
+fn required_and_rules_first_are_checked_before_binding() {
+    let mut d = fixture();
+    let rules = |v: serde_json::Value| -> Fallback { serde_json::from_value(v).unwrap() };
+    for (fallback, detail) in [
+        (
+            json!({"rules_program":"filters-fallback@1","fill":"absent_fields","required":["party_size"]}),
+            "required is allowed only with fill rules_first",
+        ),
+        (
+            json!({"rules_program":"filters-fallback@1","fill":"request_failure","required":["party_size"]}),
+            "required is allowed only with fill rules_first",
+        ),
+        (
+            json!({"rules_program":"filters-fallback@1","fill":"rules_first","required":[]}),
+            "required must name 1 to 32",
+        ),
+        (
+            json!({"rules_program":"filters-fallback@1","fill":"rules_first","required":["nope"]}),
+            "required must name 1 to 32",
+        ),
+        (
+            json!({"rules_program":"filters-fallback@1","fill":"rules_first","required":["party_size","party_size"]}),
+            "required must name 1 to 32",
+        ),
+        (
+            json!({"rules_program":"filters-fallback@1","fill":"rules_first","required":["party_size"]}),
+            "rules_first is not supported by this build",
+        ),
+    ] {
+        extract(&mut d).fallback = rules(fallback);
+        let e = refusal(&d, &[program()]);
+        assert_eq!(e.category, C::InvalidExtraction, "{e:?}");
+        assert!(e.detail.contains(detail), "{e:?}");
+    }
+}
+
+/// Spec 070 increment 1: a /2 construct is carried by the contract but not
+/// bound by this build; a /2 program of /1 constructs binds.
+#[test]
+fn version_2_constructs_are_not_bound_by_this_build() {
+    let mut d = fixture();
+    fallback(&mut d);
+    let mut v2 = serde_json::to_value(program()).unwrap();
+    v2["schema"] = json!("rustev.extract-rules/2");
+    let plain: ExtractRules = serde_json::from_value(v2.clone()).unwrap();
+    let e = refusal(&d, &[plain]);
+    assert_ne!(e.category, C::InvalidExtraction, "{e:?}");
+    v2["fields"][0]["rules"][0]["when"] = json!({"equals":{"source":"text","value":"x"}});
+    let e = refusal(&d, &[serde_json::from_value(v2).unwrap()]);
+    assert_eq!(e.category, C::InvalidExtraction, "{e:?}");
+    assert!(
+        e.detail.contains("equals is not supported by this build"),
+        "{e:?}"
+    );
+}

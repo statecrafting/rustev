@@ -74,6 +74,8 @@ pub use time::{DurationMs, Timestamp};
 /// dynamic question documents).
 pub mod schema {
     pub const EXTRACT_RULES: &str = "rustev.extract-rules/1";
+    /// Extraction rules 2 (spec 070, 3.1), a superset of version 1.
+    pub const EXTRACT_RULES_V2: &str = "rustev.extract-rules/2";
     pub const EXTRACT_REQUEST: &str = "rustev.extract-request/1";
     pub const GENERATE_REQUEST: &str = "rustev.generate-request/1";
     pub const TEXT_RESULT: &str = "rustev.text-result/1";
