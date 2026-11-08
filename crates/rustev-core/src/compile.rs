@@ -475,7 +475,7 @@ fn recompile(
                 rustev_contract::extraction_results::BoundExtractionFallback::Bound {
                     program,
                     ..
-                } => Some(program.clone()),
+                } => Some((**program).clone()),
                 _ => None,
             },
             _ => None,

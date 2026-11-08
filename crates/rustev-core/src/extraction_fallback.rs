@@ -50,6 +50,16 @@ pub fn bind(program: &ExtractRules, step: &Extract) -> Result<BoundProgram, Stri
     // Reuse document-local checks even for directly constructed Rust values.
     let bytes = serde_json::to_vec(program).map_err(|e| e.to_string())?;
     let program = ExtractRules::parse(&bytes).map_err(|e| e.to_string())?;
+    // Spec 070 increment 1 carries the version 2 constructs in the contract
+    // only; this build binds none of them yet, so a plan never holds one.
+    if let Some(member) = program
+        .fields
+        .iter()
+        .flat_map(|f| &f.rules)
+        .find_map(|r| v2_condition(&r.when).or_else(|| v2_value(&r.then)))
+    {
+        return Err(format!("{member} is not supported by this build"));
+    }
     let mut names = BTreeSet::new();
     for s in &program.sources {
         if !step.projection.contains(&s.reference) || !s.reference.starts_with("input:") {
@@ -131,10 +141,33 @@ fn value_type(v: &Expr, ty: &ExtractionType) -> bool {
     }
 }
 
+fn v2_condition(c: &Condition) -> Option<&'static str> {
+    match c {
+        Condition::Always | Condition::ContainsAny { .. } | Condition::ContainsAll { .. } => None,
+        Condition::All(cs) | Condition::Any(cs) => cs.iter().find_map(v2_condition),
+        Condition::Not(c) => v2_condition(c),
+        Condition::Equals { .. } => Some("equals"),
+        Condition::OneOf { .. } => Some("one_of"),
+    }
+}
+fn v2_value(v: &Expr) -> Option<&'static str> {
+    match v {
+        Expr::Literal(_) | Expr::IntegerAfter { .. } | Expr::DateIso { .. } => None,
+        Expr::Record(vs) => vs.values().find_map(v2_value),
+        Expr::TokenAfter { .. } => Some("token_after"),
+        Expr::TokenMatching { .. } => Some("token_matching"),
+        Expr::Date { .. } => Some("date"),
+        Expr::VocabularyAfter { .. } => Some("vocabulary_after"),
+    }
+}
+
 fn condition_sources<'a>(c: &'a Condition, out: &mut BTreeSet<&'a str>) {
     match c {
         Condition::Always => {}
-        Condition::ContainsAny { source, .. } | Condition::ContainsAll { source, .. } => {
+        Condition::ContainsAny { source, .. }
+        | Condition::ContainsAll { source, .. }
+        | Condition::Equals { source, .. }
+        | Condition::OneOf { source, .. } => {
             out.insert(source);
         }
         Condition::All(cs) | Condition::Any(cs) => {
@@ -148,7 +181,12 @@ fn condition_sources<'a>(c: &'a Condition, out: &mut BTreeSet<&'a str>) {
 fn value_sources<'a>(v: &'a Expr, out: &mut BTreeSet<&'a str>) {
     match v {
         Expr::Literal(_) => {}
-        Expr::IntegerAfter { source, .. } | Expr::DateIso { source, .. } => {
+        Expr::IntegerAfter { source, .. }
+        | Expr::DateIso { source, .. }
+        | Expr::TokenAfter { source, .. }
+        | Expr::TokenMatching { source, .. }
+        | Expr::Date { source, .. }
+        | Expr::VocabularyAfter { source, .. } => {
             out.insert(source);
         }
         Expr::Record(vs) => {
@@ -217,6 +255,11 @@ fn condition(c: &Condition, reads: &mut Reads<'_>) -> Result<bool, Reason> {
             false
         }
         Condition::Not(c) => !condition(c, reads)?,
+        // Refused by `bind` in this build (spec 070 increment 1); never
+        // false, so an unbound condition can only leave the field absent.
+        Condition::Equals { .. } | Condition::OneOf { .. } => {
+            return Err(Reason::SourceUnavailable);
+        }
     })
 }
 fn value(v: &Expr, reads: &mut Reads<'_>) -> Result<Option<Json>, Reason> {
@@ -275,6 +318,12 @@ fn value(v: &Expr, reads: &mut Reads<'_>) -> Result<Option<Json>, Reason> {
             }
             Some(Json::Object(obj))
         }
+        // `bind` refuses these until spec 070 increment 2a; like the
+        // condition arms, an unbound value leaves the field unavailable.
+        Expr::TokenAfter { .. }
+        | Expr::TokenMatching { .. }
+        | Expr::Date { .. }
+        | Expr::VocabularyAfter { .. } => return Err(Reason::SourceUnavailable),
     })
 }
 

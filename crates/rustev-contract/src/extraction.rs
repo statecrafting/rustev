@@ -109,12 +109,23 @@ pub struct ExtractionRules {
     #[serde(deserialize_with = "rules_program")]
     pub rules_program: String,
     pub fill: Fill,
+    /// The fields that must be rules-filled for the request to be skipped,
+    /// with `rules_first` only; omitted, every top-level field (spec 070,
+    /// 3.7.1). Its bounds are checked when the plan is compiled.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    pub required: Option<Vec<String>>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Fill {
     RequestFailure,
     AbsentFields,
+    /// Evaluate the rules before listing the request (spec 070, 3.7).
+    RulesFirst,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -360,7 +360,11 @@ impl Evaluation<'_> {
                     AbsenceReason::RequestFailed { reason: *reason }
                 }
                 ExtractionRequestOutcome::Withheld { reason } => *reason,
-                ExtractionRequestOutcome::Succeeded => unreachable!(),
+                // Neither is completed without fields: a skipped request
+                // (spec 070, 3.7.3) is never listed by this build.
+                ExtractionRequestOutcome::Succeeded | ExtractionRequestOutcome::Skipped { .. } => {
+                    unreachable!()
+                }
             };
             b.schema
                 .fields
@@ -386,6 +390,7 @@ impl Evaluation<'_> {
                 identity,
                 program,
                 fill,
+                ..
             } => {
                 let decl = self
                     .compiled

@@ -48,8 +48,15 @@ pub enum BoundExtractionFallback {
     None,
     Bound {
         identity: ContentDigest,
-        program: ExtractRules,
+        program: Box<ExtractRules>,
         fill: Fill,
+        /// As declared, omitted when absent (spec 070, 3.7.7 and 3.10.1).
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "crate::screening::present"
+        )]
+        required: Option<Vec<String>>,
     },
 }
 
@@ -76,8 +83,25 @@ pub enum FallbackIdentity {
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ExtractionRequestOutcome {
     Succeeded,
-    Failed { reason: RequestFailure },
-    Withheld { reason: AbsenceReason },
+    Failed {
+        reason: RequestFailure,
+    },
+    Withheld {
+        reason: AbsenceReason,
+    },
+    /// No request was listed: the rules filled every required field (spec
+    /// 070, 3.7.3 and 3.9.1).
+    Skipped {
+        reason: SkipReason,
+    },
+}
+
+/// Why an extract request was skipped; `rules_filled` is the only reason in
+/// this version (spec 070, 3.9.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SkipReason {
+    RulesFilled,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

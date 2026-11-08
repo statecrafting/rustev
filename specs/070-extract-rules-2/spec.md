@@ -2,7 +2,7 @@
 id: "070-extract-rules-2"
 title: "Extraction rules 2: token extractors, exact-value conditions, declared date formats and rules first (amends 038 and 032)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-11-08"
 summary: >
   An amendment of approved specs 038 (3.3.3, 3.3.5, 3.5, 3.7, 3.11, 3.12,
@@ -659,7 +659,25 @@ Pending with implementation.
 
 ## Implementation record
 
-None yet.
+- **Increment 1 (contract).** `rustev-contract`: `ExtractRules` reads
+  `rustev.extract-rules/1` and `/2` with one type (`versioned_document!`),
+  its identity tagged with the document's own schema; `month_tables`, the
+  conditions `equals` and `one_of` (`Scalar`), the values `token_after`,
+  `token_matching` (`ShapeElement`, `ByteClass`), `date` (`DateFormat`)
+  and `vocabulary_after`, with every parse-time bound of 3.1.2; a /1
+  document holding any of them is refused as an unknown member (3.1.3).
+  `Fill::RulesFirst` and the optional `required`; the plan 3
+  `BoundExtractionFallback::Bound` carries `required` only when declared;
+  `ExtractionRequestOutcome::Skipped { reason: rules_filled }`. The /1
+  schema keeps its bytes (the /2 members are removed from its emission);
+  `rustev.extract-rules-2.schema.json` is new and the definition, plan,
+  evidence 2 and run 3 schemas and both bindings' declarations regenerate.
+  `rustev-core` binds none of the new constructs yet: `bind` refuses them
+  and compilation refuses `rules_first` (`invalid_extraction`, "not
+  supported by this build") until increments 2 and 3; `required` is
+  checked now (3.5.6, 3.7.1). Tests:
+  `crates/rustev-contract/tests/extract_rules_2.rs`. No golden, plan or
+  `PlanId` changed.
 
 ## Decisions at approval
 
