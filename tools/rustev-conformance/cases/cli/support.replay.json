@@ -20,14 +20,14 @@
     {
       "name": "support-emb.bundle.json",
       "path": "tools/rustev-conformance/fixtures/cli/support.replay/support-emb.bundle.json",
-      "sha256": "a5d5a065f56c23cd93ef8697faeee5067892910dc54d4f338d0f9675223e4a94"
+      "sha256": "cb332b04be7e22cc02062c1799062eba0f8664d6a4d5b4d60daeeb060011bf78"
     }
   ],
   "outputs": [
     {
       "golden": "crates/rustev-cli/tests/golden/support.replay.json",
       "normalize": [],
-      "sha256": "6e1770d96ce58fe29588694bebc6c2ec4e3864a2bbedce25bdb1c0c887d97553",
+      "sha256": "f5ad680c5e01844332a4b53e270af0fd80c873d6373edcd9ff83a378ae94758c",
       "stream": "stdout"
     }
   ],

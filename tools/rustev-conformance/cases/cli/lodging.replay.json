@@ -20,14 +20,14 @@
     {
       "name": "lodging-emb.bundle.json",
       "path": "tools/rustev-conformance/fixtures/cli/lodging.replay/lodging-emb.bundle.json",
-      "sha256": "c22918ff72340de651eb53d1d4413e237afd681d593ca4a50c51966e457ecafb"
+      "sha256": "cab4221745ea54a93c4d3c5070572518b8ae5cdff6ddcf1b2dee9e4924769300"
     }
   ],
   "outputs": [
     {
       "golden": "crates/rustev-cli/tests/golden/lodging.replay.json",
       "normalize": [],
-      "sha256": "82abca2fcf7043d5713562ee9653e5389535333e37590798e6ef7a5ca3e3d7a6",
+      "sha256": "a8696a69168a058d60bf12a76aec909fc0fb79b8235caabc0986729e595111aa",
       "stream": "stdout"
     }
   ],

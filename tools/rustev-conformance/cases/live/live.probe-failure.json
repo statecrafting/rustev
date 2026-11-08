@@ -20,7 +20,7 @@
     {
       "name": "candidates/a/plan.json",
       "path": "tools/rustev-conformance/fixtures/live/candidates/a/plan.json",
-      "sha256": "53d25b704b77c3d732e92d0ebbb878ec85fa6c6f1df187a754f98c521e5baa3a"
+      "sha256": "ab4d32f6c3efce896a96e60b415c3b81ac91991ed8b2c7a3b117563f5994b933"
     },
     {
       "name": "config.json",
@@ -200,7 +200,7 @@
       "file": "run-1/out/checkpoint.json",
       "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/checkpoint.json",
       "normalize": [],
-      "sha256": "612775845e59785f22a970c12557f452448f91afe1d18c172d51e5b78c401818"
+      "sha256": "8d8d6ad078721aeb3101d9c100e65fac4c41906e8c5c4ec316fe99b9005ca208"
     },
     {
       "file": "run-1/out/live-config.json",
@@ -212,25 +212,25 @@
       "file": "run-1/out/live-run.json",
       "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/live-run.json",
       "normalize": [],
-      "sha256": "7c8ef0d909617abdd258d7f6729960093f97a1764fb82e79a8565bc5e857ca44"
+      "sha256": "a092f0addb998372889c199784c684a0697cec73e2cab59d9d708fb1910644df"
     },
     {
       "file": "run-1/out/probe/1.1.case.json",
       "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/probe/1.1.case.json",
       "normalize": [],
-      "sha256": "655663cefebc251717856c344a2afbf07104f634fc81ac60c9995121f305c97f"
+      "sha256": "cfaa438e55c189b09d0bcf90255c06a6372c7cc358d3fa38beafc1fe126730fa"
     },
     {
       "file": "run-1/out/probe/1.1.live.json",
       "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/probe/1.1.live.json",
       "normalize": [],
-      "sha256": "d7787e75e1abd9cc5bc431e73df6beca9a3a8790f6f33b0df629924de8584326"
+      "sha256": "059fae8ceb6a40c75eaaf8d8b7fe375e6e15f0b4ef5858f43a1ce05c71ad0ba6"
     },
     {
       "file": "run-1/out/probe/1.1.run.json",
       "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/probe/1.1.run.json",
       "normalize": [],
-      "sha256": "61f0a6cc603ea4a59d9e2db4a094cf8fe7e2f37dee7f73f5fde6ec980f4791fc"
+      "sha256": "eec7828b04a3594d541d64f829b26c5817e9adb849122966f17b11dd58e344fa"
     },
     {
       "file": "status.json",
