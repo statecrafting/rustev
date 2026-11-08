@@ -303,7 +303,7 @@
       "file": "journal.jsonl",
       "golden": "tools/rustev-conformance/expected/live/live.resume/journal.jsonl",
       "normalize": [],
-      "sha256": "dccd128055d12becf6731371e42642ca2ef9f213e29ed2da696c19da4d5bb300"
+      "sha256": "6d0313272764d3bf4d02a08a377b0a0d42f08226156ef2c6f3618772dacd61e8"
     },
     {
       "file": "out/a/adapter.json",

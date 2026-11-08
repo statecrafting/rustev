@@ -194,7 +194,7 @@
       "file": "journal.jsonl",
       "golden": "tools/rustev-conformance/expected/live/live.probe-failure/journal.jsonl",
       "normalize": [],
-      "sha256": "fdf10be1007db267eb6a5d49b45ac46ff98f3cbcaf83fa820e1a20f646caf7af"
+      "sha256": "beab25047fb8467b36e15ca807799c18e09c6981c5a9145a53767c864588b3c7"
     },
     {
       "file": "out/checkpoint.json",

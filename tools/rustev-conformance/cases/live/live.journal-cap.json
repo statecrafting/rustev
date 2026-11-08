@@ -35,7 +35,7 @@
     {
       "name": "journal.jsonl",
       "path": "tools/rustev-conformance/fixtures/live/journal-cap.jsonl",
-      "sha256": "007b61f92c64147893d64369940d6080a9892fdeec239d13d7725666a3cb61cc"
+      "sha256": "b439d86ef7eb4a0294a6b53928998cf8dd03dbee3fb847bfd81f10c43757a911"
     },
     {
       "name": "live.json",
@@ -214,7 +214,7 @@
       "file": "journal.jsonl",
       "golden": "tools/rustev-conformance/expected/live/live.journal-cap/journal.jsonl",
       "normalize": [],
-      "sha256": "bd33c29377151ed45d8a0d25345307740222670aa4d710f6cb987989385e2a30"
+      "sha256": "452c09cbae53ab5064cac77ba9f3e98578871c4fd5fc46b2126c878a13ea9ace"
     },
     {
       "file": "out/checkpoint.json",
