@@ -1,15 +1,12 @@
 //! Binding live preconditions (spec 067, increment 1).
 
 use std::collections::BTreeMap;
-use std::path::Path;
-use std::sync::Arc;
 
 use rustev_contract::Identified;
 use rustev_contract::live::{AuthorizationReference, AuthorizationRequest};
 use rustev_contract::run::CostModel;
 use rustev_core::Compiled;
 use rustev_live::documents::{Candidates, LiveConfig, LiveError, Mode};
-use rustev_live::journal::{BudgetKind, JournalError, SpendClock, SpendJournal};
 use rustev_runtime::{DispatchAnswer, LiveAuthorizer, Runtime};
 
 /// Spec 067, 3.2.4: live refusals are outcome values, not exceptions.
@@ -148,26 +145,6 @@ pub(crate) fn check_backends(
     check_config(config, &candidates)
 }
 
-/// Spec 067, 3.4.1: explicit path, testing budget, injected clock and CLI errors.
-pub(crate) fn open_journal(
-    path: &Path,
-    clock: Arc<dyn SpendClock>,
-) -> Result<SpendJournal, LiveRefusal> {
-    SpendJournal::open(path, BudgetKind::Testing, clock).map_err(|error| {
-        let (code, subject) = match &error {
-            JournalError::Mismatch(_) => (4, "journal-budget"),
-            JournalError::Locked(_) => (3, "journal-locked"),
-            _ => (3, "journal"),
-        };
-        LiveRefusal {
-            code,
-            subject: subject.into(),
-            detail: error.to_string(),
-        }
-    })
-}
-
-/// Spec 067, 3.4.2: live output and checkpoints require filesystem durability.
 #[derive(Clone, Copy)]
 pub(crate) enum HostKind {
     Filesystem,
@@ -200,9 +177,9 @@ mod tests {
         AttemptCall, AttemptReport, BoxFuture, DecisionBackend, EvidenceSink,
     };
     use rustev_live::documents::{AuthorizationRule, CostUnit};
-    use rustev_live::journal::SetClock;
     use rustev_runtime::{ManualClock, RuntimeConfig, SinkPolicy};
     use serde_json::json;
+    use std::sync::Arc;
 
     fn digest(c: char) -> String {
         format!("sha256:{}", c.to_string().repeat(64))
@@ -533,36 +510,6 @@ mod tests {
             r.exposure.reserved_units = units;
             assert_refused(&auth, &r, None);
         }
-    }
-
-    #[test]
-    fn journal_creation_budget_lock_and_io_mapping() {
-        let dir = Dir::new();
-        let path = dir.0.join("journal");
-        let clock = Arc::new(SetClock::new(123));
-        let journal = open_journal(&path, clock.clone()).unwrap();
-        let header: serde_json::Value = serde_json::from_str(
-            std::fs::read_to_string(&path)
-                .unwrap()
-                .lines()
-                .next()
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(header["budget"], "testing");
-        assert_eq!(header["cap"], BudgetKind::Testing.cap());
-        refused(open_journal(&path, clock.clone()), 3, "journal-locked");
-        drop(journal);
-        open_journal(&path, clock.clone()).unwrap();
-        for (budget, cap) in [("production", BudgetKind::Production.cap()), ("testing", 1)] {
-            std::fs::write(&path, format!("{}\n", json!({"schema": rustev_live::journal::JOURNAL_SCHEMA, "budget": budget, "cap": cap}))).unwrap();
-            refused(open_journal(&path, clock.clone()), 4, "journal-budget");
-        }
-        refused(
-            open_journal(&dir.0.join("absent/journal"), clock),
-            3,
-            "journal",
-        );
     }
 
     #[test]

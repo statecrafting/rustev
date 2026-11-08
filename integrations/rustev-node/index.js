@@ -623,6 +623,27 @@ class Engine {
     });
   }
 
+  /** A durable live evaluation over registered host backends. */
+  async liveRun(options) {
+    const { signal, ...args } = options;
+    const cancel = wrap(() => natives.get(this).cancelHandle());
+    running.get(this).add(cancel);
+    if (signal?.aborted) cancel.raise();
+    const onAbort = () => cancel.raise();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    begin();
+    try {
+      const result = await natives.get(this).liveRun(args, cancel);
+      return { ...result, journal: result.journal ?? null };
+    } catch (e) {
+      throw typed(e);
+    } finally {
+      end();
+      running.get(this).delete(cancel);
+      signal?.removeEventListener('abort', onAbort);
+    }
+  }
+
   /** A pure command through the shared surface, on the blocking pool: the
    * CLI's exit code, its output bytes and the artifacts it published. */
   async command(name, inputs, args) {

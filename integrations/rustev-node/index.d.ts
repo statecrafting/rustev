@@ -261,6 +261,7 @@ export interface CommandResult {
 }
 
 export declare class Engine {
+  liveRun(options: LiveRunOptions): Promise<LiveRunResult>;
   explain(evidence: ExplainEvidence, query: ExplainQuery, options?: ExplainOptions): Promise<ExplainResult>;
   static create(options: EngineOptions): Promise<Engine>;
   /** Compile a definition, or load a compiled `plan`, and prepare it:
@@ -513,6 +514,62 @@ interface RepeatEvalCommon {
   store?: string;
   out: string;
 }
+/** Spec 067, 3.2.1: one option per `rustev eval live` flag. Every path is
+ * read from (or, for `journal` and `out`, written to) the filesystem; an
+ * `inputs` map of documents (the memory host) is refused. */
+export interface LiveRunOptions {
+  live: true;
+  liveConfig: string;
+  /** A spec 012 / 043 3.5 journal file; created unless `requireExistingJournal`. */
+  journal: string;
+  runId: string;
+  dataset: string;
+  /** `final_test` is refused (no live exposure recording). */
+  split: 'training' | 'model_selection' | 'calibration';
+  config: string;
+  adapter: string;
+  scope: RepeatScope;
+  nowMs: number;
+  repeatConfig: string;
+  /** 043's candidate layout: one directory per candidate. */
+  candidates: string;
+  /** Exactly one of `snapshots` and `bundles`. */
+  snapshots?: string;
+  bundles?: string;
+  captures?: string;
+  admission?: string;
+  purpose?: 'measurement' | 'optimization';
+  /** Spec 029's ledger options: refused outside `final_test`, which is refused. */
+  lineage?: string;
+  ledger?: string;
+  ledgerNew?: boolean;
+  ledgerOut?: string;
+  hostCapMs?: number;
+  store?: string;
+  runDeadlineMs?: number;
+  probeOnly?: boolean;
+  resume?: boolean;
+  /** Needs `resume`. */
+  rerunInterrupted?: boolean;
+  requireExistingJournal?: boolean;
+  /** A new directory, unless `resume`. */
+  out: string;
+  signal?: AbortSignal;
+}
+export type LiveRunStatus = 'evaluated_live' | 'probed' | 'probe_failed'
+  | 'spend_capped' | 'interrupted' | 'invalid_input' | 'io_error';
+export interface LiveRunResult {
+  code: number;
+  out: Uint8Array;
+  status: LiveRunStatus;
+  journal: null | {
+    id: string | null;
+    createdAtMs: number | null;
+    created: 'this_run' | 'earlier' | 'legacy';
+    spendBefore: number;
+  };
+}
+
 export interface EvalRepeatArgs extends RepeatEvalCommon {
   candidatePlan?: string;
   descriptors?: string[];
