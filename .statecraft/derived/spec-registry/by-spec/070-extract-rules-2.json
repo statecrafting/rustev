@@ -67,6 +67,14 @@
       },
       {
         "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "001-boundaries-and-authority",
         "unit": {
           "kind": "file",
@@ -138,7 +146,7 @@
       }
     ],
     "sectionDigests": {
-      "070-extraction-rules-2-token-extractors-exact-value-conditions-declared-date-formats-and-rules-first-amends-038-and-032": "a4875a4a63e1314424e9e661bbe28b612b2239b8c990aa134555e20416b00dd9",
+      "070-extraction-rules-2-token-extractors-exact-value-conditions-declared-date-formats-and-rules-first-amends-038-and-032": "5c606c85efad2123ac2b644368b8d077e8c341d5e88621e982c089ae5483c514",
       "1-purpose": "c27d666654080228bb42b54d7d4a519a115808f44be88e726e22c9e4795c196f",
       "2-1-binding-principles": "730a089e011a10d9dffd324d744d8ff81340332a35875f5921ca1cf81a2695c5",
       "2-territory": "8422c5c45faf6648154ee1468694a7467df2278072119da3ab2466c546a78805",
@@ -159,7 +167,7 @@
       "5-observable-negative-cases": "7866b1ccf648893e1ac03a3892f9fbcc789f5b05ff7ff7a81d543fb65984886b",
       "acceptance": "94bf9b999610f485446de1ae50844e60f138f0248e13c72aaf4b71b8d6760273",
       "decisions-at-approval": "f6a8896774c4e3e286179bdf7b26ae7e36e4b9cc99f3f7afaae89c431e4b783e",
-      "implementation-record": "dd2fbe5200f69cf7c762906e5382b3b453d5c1956a6b228fa3ed463a473039db",
+      "implementation-record": "3f9e2061f8d5263c49e88ae7db17642fccfa733ef1f816a1bd21753ffacf5a9a",
       "increments": "9b48d54b050e75c77f393eecd04201225a4b197d8a06bba9ef0bb436176c75a8",
       "verification": "f09d2ecfe0427f0790e7e18b53ef96c9fa64f2204dc26649b98e8ea7e9ab792b"
     },
@@ -194,6 +202,6 @@
     "summary": "An amendment of approved specs 038 (3.3.3, 3.3.5, 3.5, 3.7, 3.11, 3.12, 3.14) and 032 (3.2.1, 3.9.3), for #572, ratified by the owner on 2026-11-08 (A-90) for release 0.7.0. A host that runs per-sender templates over forwarded booking emails cannot express them in `rustev.extract-rules/1`, so it runs them as a host backend and every templated field becomes `model-derived`. This spec adds the program schema `rustev.extract-rules/2`, a superset of /1: the value extractors `token_after` (a token from a declared ASCII charset after a term), `token_matching` (a token of a small structured shape, never a regular expression), `date` (a closed set of declared formats with month names from a table the program declares) and `vocabulary_after` (a token that is a member of a declared vocabulary, graded `hint` under spec 032); the conditions `equals` and `one_of` over an exact input value; and the extract step's `fill: rules_first`, which evaluates the program before the request is listed, skips the request when every required field is filled, and otherwise asks the backend only for the fields the rules left absent. Everything stays pure, bounded and evaluated in `rustev-core` with no new dependency. A rules match is evidence that this program produced this value from this text, never that the value is true. /1 programs, every existing plan and every `PlanId` keep their bytes.\n",
     "title": "Extraction rules 2: token extractors, exact-value conditions, declared date formats and rules first (amends 038 and 032)"
   },
-  "shardHash": "83141c6b499ae60a5f00575594f438a26ea2f87884926e76e946bad45ff2a7b4",
+  "shardHash": "dbff19166011f066c8319db86f8a28365a645ec90f74caa35981518ea864e0c2",
   "specVersion": "1.11.0"
 }

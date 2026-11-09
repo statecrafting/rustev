@@ -3,11 +3,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rustev_contract::{
     Document,
+    definition::{InputDecl, TypeDecl},
     extraction::{
         AbsenceReason as Reason, Distributions, Extract, ExtractionSchema, ExtractionType, Fill,
     },
     extraction_documents::{
-        ExtractRules, ExtractionCondition as Condition, ExtractionValue as Expr,
+        DateFormat, ExtractRules, ExtractionCondition as Condition, ExtractionValue as Expr,
     },
     extraction_results::{ExtractionFieldEvidence, ExtractionOrigin},
     judgment::Derivation,
@@ -47,11 +48,22 @@ pub struct BoundProgram {
 /// `invalid_extraction`. Literal bounds and vocabulary membership are evaluated
 /// later by the shared field validator, against resolved vocabularies.
 pub fn bind(program: &ExtractRules, step: &Extract) -> Result<BoundProgram, String> {
+    bind_in(program, step, &[])
+}
+
+/// [`bind`], with the definition's inputs, which spec 070's binding checks
+/// read (3.5): a source a version 2 extractor reads is a declared `text`
+/// input or record field. Without them no such source binds.
+pub fn bind_in(
+    program: &ExtractRules,
+    step: &Extract,
+    inputs: &[InputDecl],
+) -> Result<BoundProgram, String> {
     // Reuse document-local checks even for directly constructed Rust values.
     let bytes = serde_json::to_vec(program).map_err(|e| e.to_string())?;
     let program = ExtractRules::parse(&bytes).map_err(|e| e.to_string())?;
-    // Spec 070 increment 1 carries the version 2 constructs in the contract
-    // only; this build binds none of them yet, so a plan never holds one.
+    // Spec 070 increment 2a binds the token and date extractors; the
+    // exact-value conditions and vocabulary capture follow in 2b.
     if let Some(member) = program
         .fields
         .iter()
@@ -88,6 +100,7 @@ pub fn bind(program: &ExtractRules, step: &Extract) -> Result<BoundProgram, Stri
             if let Some(s) = used.iter().find(|s| !names.contains(**s)) {
                 return Err(format!("undeclared source {s}"));
             }
+            extractors_v2(&program, &rule.then, inputs)?;
             if let ExtractionType::List { item, .. } = &declared.ty {
                 let Expr::Literal(v) = &rule.then else {
                     return Err(format!("list field {} requires literal items", f.field));
@@ -133,7 +146,9 @@ fn value_type(v: &Expr, ty: &ExtractionType) -> bool {
     match (v, ty) {
         (Expr::Literal(v), ty) => literal_type(v, ty),
         (Expr::IntegerAfter { .. }, ExtractionType::Integer { .. })
-        | (Expr::DateIso { .. }, ExtractionType::Date {}) => true,
+        | (Expr::DateIso { .. }, ExtractionType::Date {})
+        | (Expr::TokenAfter { .. } | Expr::TokenMatching { .. }, ExtractionType::Text { .. })
+        | (Expr::Date { .. }, ExtractionType::Date {}) => true,
         (Expr::Record(values), ExtractionType::Record { fields }) => values
             .iter()
             .all(|(n, v)| fields.iter().any(|f| f.name == *n && value_type(v, &f.ty))),
@@ -154,11 +169,80 @@ fn v2_value(v: &Expr) -> Option<&'static str> {
     match v {
         Expr::Literal(_) | Expr::IntegerAfter { .. } | Expr::DateIso { .. } => None,
         Expr::Record(vs) => vs.values().find_map(v2_value),
-        Expr::TokenAfter { .. } => Some("token_after"),
-        Expr::TokenMatching { .. } => Some("token_matching"),
-        Expr::Date { .. } => Some("date"),
+        Expr::TokenAfter { .. } | Expr::TokenMatching { .. } | Expr::Date { .. } => None,
         Expr::VocabularyAfter { .. } => Some("vocabulary_after"),
     }
+}
+
+/// The declared type of an input reference `input:<name>` or
+/// `input:<name>/<field>`.
+fn input_type<'a>(inputs: &'a [InputDecl], reference: &str) -> Option<&'a TypeDecl> {
+    let path = reference.strip_prefix("input:")?;
+    let (name, field) = match path.split_once('/') {
+        Some((name, field)) => (name, Some(field)),
+        None => (path, None),
+    };
+    let ty = &inputs.iter().find(|i| i.name == name)?.ty;
+    match (ty, field) {
+        (ty, None) => Some(ty),
+        (TypeDecl::Record { fields, .. }, Some(field)) => {
+            fields.iter().find(|f| f.name == field).map(|f| &f.ty)
+        }
+        _ => None,
+    }
+}
+
+/// Spec 070, 3.5.1 and 3.5.4: a version 2 extractor reads a projected
+/// `text` source, and a date names a declared month table exactly when its
+/// format has month names.
+fn extractors_v2(program: &ExtractRules, v: &Expr, inputs: &[InputDecl]) -> Result<(), String> {
+    let source = match v {
+        Expr::Record(vs) => {
+            return vs
+                .values()
+                .try_for_each(|v| extractors_v2(program, v, inputs));
+        }
+        Expr::Literal(_) | Expr::IntegerAfter { .. } | Expr::DateIso { .. } => return Ok(()),
+        Expr::Date {
+            source,
+            format,
+            months,
+            ..
+        } => {
+            let named = matches!(format, DateFormat::DmyName | DateFormat::MdyName);
+            match months {
+                None if named => return Err(format!("date format {format:?} requires months")),
+                Some(_) if !named => {
+                    return Err(format!("date format {format:?} takes no months"));
+                }
+                Some(t)
+                    if !program
+                        .month_tables
+                        .as_ref()
+                        .is_some_and(|tables| tables.contains_key(t)) =>
+                {
+                    return Err(format!("undeclared month table {t}"));
+                }
+                _ => {}
+            }
+            source
+        }
+        Expr::TokenAfter { source, .. }
+        | Expr::TokenMatching { source, .. }
+        | Expr::VocabularyAfter { source, .. } => source,
+    };
+    let reference = program
+        .sources
+        .iter()
+        .find(|s| s.name == *source)
+        .map(|s| s.reference.as_str())
+        .unwrap_or_default();
+    if !matches!(input_type(inputs, reference), Some(TypeDecl::Text { .. })) {
+        return Err(format!(
+            "source {source} of a version 2 extractor is not text"
+        ));
+    }
+    Ok(())
 }
 
 fn condition_sources<'a>(c: &'a Condition, out: &mut BTreeSet<&'a str>) {
@@ -198,6 +282,7 @@ fn value_sources<'a>(v: &'a Expr, out: &mut BTreeSet<&'a str>) {
 }
 
 struct Reads<'a> {
+    months: &'a BTreeMap<String, Vec<Vec<String>>>,
     sources: &'a BTreeMap<String, Source<'a>>,
     references: &'a BTreeMap<&'a str, &'a str>,
     max_bytes: u64,
@@ -272,12 +357,7 @@ fn value(v: &Expr, reads: &mut Reads<'_>) -> Result<Option<Json>, Reason> {
         } => {
             let text = reads.get(source)?;
             // Earliest byte offset wins; equal offsets keep declared term order.
-            let first = terms
-                .iter()
-                .filter_map(|t| occurrence(text, t).map(|i| (i, t.len())))
-                .enumerate()
-                .min_by_key(|(order, (i, _))| (*i, *order));
-            let Some((_, (i, len))) = first else {
+            let Some((i, len)) = crate::extraction_match::first_term(text, terms) else {
                 return Ok(None);
             };
             let tail = &text[i + len..];
@@ -318,12 +398,46 @@ fn value(v: &Expr, reads: &mut Reads<'_>) -> Result<Option<Json>, Reason> {
             }
             Some(Json::Object(obj))
         }
-        // `bind` refuses these until spec 070 increment 2a; like the
+        Expr::TokenAfter {
+            source,
+            terms,
+            charset,
+            min_len,
+            max_len,
+        } => crate::extraction_match::token_after(
+            reads.get(source)?,
+            terms,
+            charset,
+            *min_len,
+            *max_len,
+        )
+        .map(Json::String),
+        Expr::TokenMatching {
+            source,
+            shape,
+            occurrence,
+        } => crate::extraction_match::token_matching(
+            reads.get(source)?,
+            shape,
+            occurrence.unwrap_or(1),
+        )
+        .map(Json::String),
+        Expr::Date {
+            source,
+            format,
+            months,
+            occurrence,
+        } => {
+            let text = reads.get(source)?;
+            let table = months
+                .as_ref()
+                .and_then(|t| reads.months.get(t))
+                .map_or(&[][..], Vec::as_slice);
+            crate::extraction_match::date(text, *format, table, *occurrence).map(Json::String)
+        }
+        // `bind` refuses this until spec 070 increment 2b; like the
         // condition arms, an unbound value leaves the field unavailable.
-        Expr::TokenAfter { .. }
-        | Expr::TokenMatching { .. }
-        | Expr::Date { .. }
-        | Expr::VocabularyAfter { .. } => return Err(Reason::SourceUnavailable),
+        Expr::VocabularyAfter { .. } => return Err(Reason::SourceUnavailable),
     })
 }
 
@@ -337,6 +451,7 @@ impl BoundProgram {
         vocabularies: &BTreeMap<String, Vec<String>>,
         max_projection_bytes: u64,
     ) -> Vec<FallbackField> {
+        let months = self.program.month_tables.clone().unwrap_or_default();
         let references = self
             .program
             .sources
@@ -348,6 +463,7 @@ impl BoundProgram {
             .iter()
             .map(|field| {
                 let mut reads = Reads {
+                    months: &months,
                     sources,
                     references: &references,
                     max_bytes: max_projection_bytes,

@@ -45,6 +45,9 @@ extends:
   # Conformance cases for rules first, and the WebAssembly gate value if
   # an increment crosses it (3.11).
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: amending }
+  # The core's new source file `src/extraction_match.rs` enters the
+  # published archive policy (increment 2a).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 070 to `make verify` at completion.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
   # Places 070 in CI's `integrations-base` acceptance group at completion.
@@ -678,6 +681,25 @@ Pending with implementation.
   checked now (3.5.6, 3.7.1). Tests:
   `crates/rustev-contract/tests/extract_rules_2.rs`. No golden, plan or
   `PlanId` changed.
+- **Increment 2a (core: token and date extractors).** `rustev-core`:
+  `src/extraction_match.rs` holds the byte matchers (3.2, 3.3.1 to
+  3.3.3): earliest term with declared-order ties, the one-separator skip,
+  byte classes, token boundaries, `token_after`'s whole-run-or-nothing,
+  possessive `token_matching` with its occurrence, and every `date` format
+  with declared month tables, proleptic Gregorian validity (a
+  calendar-invalid match ends the search) and `YYYY-MM-DD` rendering,
+  validated by 038 3.4. `extraction_fallback::bind_in` takes the
+  definition's inputs and adds 3.5.1, 3.5.3 and 3.5.4 for these
+  extractors (a projected `text` source, the field type, `months` exactly
+  for a name format and naming a declared table); `bind` without inputs
+  binds no version 2 extractor. `equals`, `one_of` and `vocabulary_after`
+  stay refused until 2b. Tests: `crates/rustev-core/tests/extraction_rules_2.rs`
+  (section 5's extractor rows, boundaries with non-ASCII bytes, every
+  format with valid, calendar-invalid and pre-1970 dates, a native
+  byte-identity corpus) and `tests/extraction_compile.rs` (the golden
+  `tests/golden/extraction-rules-2.plan.json` and its `PlanId`, identity
+  over every program member, refusals in phase c). The archive policy
+  lists the new file. No existing golden, plan or `PlanId` changed.
 
 ## Decisions at approval
 

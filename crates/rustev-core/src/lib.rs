@@ -21,6 +21,7 @@ pub(crate) mod execution;
 pub mod expr;
 mod extraction_compile;
 pub mod extraction_fallback;
+mod extraction_match;
 pub mod extraction_validate;
 mod generation;
 pub mod generation_eval;
