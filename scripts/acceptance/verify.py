@@ -62,7 +62,7 @@ GROUPS = {
     "integrations-base": "002 010 033 038 040 042 070".split(),
     "integrations-remote": "012 015 017 019 020 030 059".split(),
     "integrations-core": "021 036 037 045 060".split(),
-    "integrations-plans": "022 031 034 035 066".split(),
+    "integrations-plans": "022 031 034 035 066 068".split(),
     "runtime-evidence": "003 007 008 009 013 023 026 027 028 039 043 044 049 063".split(),
     "node-live": "067 069".split(),
 }
