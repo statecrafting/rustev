@@ -418,3 +418,15 @@ are regenerated with the pinned engine. What changes for rustev:
   runner disk before the build.
 - Revision 26 (statecraft-cli spec 068): AI review findings carry a
   severity, and answered low-severity findings need no exception.
+
+## Supply-chain advisory record (2026-11-09)
+
+RUSTSEC-2026-0459, published on 2026-11-09, made the `supply-chain` job
+fail on every pull request: the SQLite bundled in `libsqlite3-sys` 0.38.2
+is older than 3.54.0. It reaches only `rustev-aicortex` and `rustev-rahi`,
+through `rusqlite` 0.40, `hiqlite-patched` and `rahi-store`, and the newest
+`hiqlite-patched` still requires `rusqlite` 0.40. The owner accepted it as
+an ignore entry in the workspace `deny.toml` (A-91, #583), with a reason
+and a revisit date of 2027-02-05; the release family's policy is
+unchanged, and no release-set crate reaches the crate. The entry is
+removed when a `hiqlite-patched` on `rusqlite` 0.41 can be adopted.
