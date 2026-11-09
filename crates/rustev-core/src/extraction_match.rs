@@ -82,6 +82,17 @@ pub(crate) fn token_after(
         .then(|| token(&text[p..p + n]))
 }
 
+/// The run of letters and digits after the term and the skip, for
+/// `vocabulary_after` (spec 070, 3.3.5): 1 to 64 bytes, else nothing.
+pub(crate) fn word_after(text: &[u8], terms: &[String]) -> Option<String> {
+    let p = after_term(text, terms)?;
+    let n = text[p..]
+        .iter()
+        .take_while(|b| b.is_ascii_alphanumeric())
+        .count();
+    (1..=64).contains(&n).then(|| token(&text[p..p + n]))
+}
+
 /// The end of a possessive shape match at `start`, if any (spec 070, 3.3.2).
 fn shape_at(text: &[u8], start: usize, shape: &[ShapeElement]) -> Option<usize> {
     let mut p = start;

@@ -700,6 +700,32 @@ Pending with implementation.
   `tests/golden/extraction-rules-2.plan.json` and its `PlanId`, identity
   over every program member, refusals in phase c). The archive policy
   lists the new file. No existing golden, plan or `PlanId` changed.
+- **Increment 2b (core: exact-value conditions, vocabulary capture and
+  its grade).** `rustev-core`: `equals` and `one_of` compare text by
+  bytes and integers, booleans and enum options by value (3.4.3);
+  `Source::Exact` carries a non-text input value, and an unreadable
+  condition source ends the field `source_unavailable`, never false
+  (3.4.5); a condition source is a read and enters lineage and
+  derivation (3.4.4). Binding (3.4.2, 3.5.2): a non-nullable `text`,
+  `integer`, `bool` or `enum` input or record field whose provenance
+  excludes `model-derived`, values of its type and enum values among its
+  options; a source read only by exact-value conditions need not be
+  projected. `vocabulary_after` captures a letter-and-digit run of 1 to
+  64 bytes that equals an option byte for byte, fills `text` or the
+  `enum` of its own vocabulary, and leaves the field
+  `vocabulary_unavailable` when its input vocabulary was unavailable and
+  no rule applied (3.3.5, 3.5.5). Grades (3.8): `extraction_fallback::hint_paths`
+  names every field or record subfield such a rule can fill; phase e2
+  gives the extract step a record tree of its declared fields with those
+  at `hint` (`quality::extract_tree`), so an accept step over one takes
+  `hint` and a hard gate on it is refused with category 14 unless a
+  corroboration step raises it; every present value of such a field,
+  model or rules, carries value metadata graded `hint` with the
+  provenance and sources it read. Plans without `vocabulary_after` keep
+  one `ungraded` leaf and their bytes. Tests: `tests/extraction_rules_2.rs`
+  (each source type, no folding, unresolved sources under `not`, binding
+  rows, vocabulary rows) and `tests/extraction_rules_2_grade.rs` (static
+  refusal, corroboration, dynamic grade of a model and a rules value).
 
 ## Decisions at approval
 

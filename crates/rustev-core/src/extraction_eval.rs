@@ -418,26 +418,37 @@ impl Evaluation<'_> {
                         }) {
                             return None;
                         }
-                        let Value::Text(text) = self.value_and_meta(&s.reference).ok()?.0 else {
-                            return None;
+                        // Spec 070, 3.4: a non-text scalar is read only by an
+                        // exact-value condition; an enum is its option text.
+                        use rustev_contract::extraction_documents::Scalar;
+                        let value = match self.value_and_meta(&s.reference).ok()?.0 {
+                            Value::Text(t) => (Scalar::Text(t), true),
+                            Value::Enum(t) => (Scalar::Text(t), false),
+                            Value::Integer(n) => (Scalar::Integer(n), false),
+                            Value::Bool(b) => (Scalar::Bool(b), false),
+                            _ => return None,
                         };
-                        Some((s.reference.clone(), text))
+                        Some((s.reference.clone(), value))
                     })
                     .collect();
                 let sources = owned
                     .iter()
-                    .map(|(r, text)| {
-                        (
-                            r.clone(),
-                            crate::extraction_fallback::Source::Readable {
-                                bytes: text.as_bytes(),
-                                derivation: self
-                                    .derivation
-                                    .get(&crate::expr::base_ref_v2(r))
-                                    .copied()
-                                    .unwrap_or(Derivation::ExactDerived),
+                    .map(|(r, (value, text))| {
+                        use crate::extraction_fallback::Source;
+                        use rustev_contract::extraction_documents::Scalar;
+                        let derivation = self
+                            .derivation
+                            .get(&crate::expr::base_ref_v2(r))
+                            .copied()
+                            .unwrap_or(Derivation::ExactDerived);
+                        let source = match value {
+                            Scalar::Text(t) if *text => Source::Readable {
+                                bytes: t.as_bytes(),
+                                derivation,
                             },
-                        )
+                            value => Source::Exact { value, derivation },
+                        };
+                        (r.clone(), source)
                     })
                     .collect();
                 let results = bound.evaluate(
@@ -454,6 +465,16 @@ impl Evaluation<'_> {
                 FallbackIdentity::Identity(identity.clone())
             }
         };
+        let hints = match &b.fallback {
+            BoundExtractionFallback::Bound { program, .. } => {
+                crate::extraction_fallback::hint_paths(program)
+            }
+            BoundExtractionFallback::None => Default::default(),
+        };
+        if !hints.is_empty() {
+            let meta = self.extract_hint_meta(&b, &fields, &fallback_reads, &hints);
+            self.metas.insert(format!("step:{id}"), meta);
+        }
         let mut values = BTreeMap::new();
         for field in &fields {
             let path = format!("step:{id}/{}", field.evidence.name);
@@ -506,6 +527,63 @@ impl Evaluation<'_> {
                 fields: fields.into_iter().map(|f| f.evidence).collect(),
             },
         );
+    }
+
+    /// Spec 070, 3.8.2: every present value of a field (or record subfield)
+    /// that a `vocabulary_after` rule can fill is graded `hint`, whatever its
+    /// origin, with the provenance and sources of what it read; other values
+    /// stay ungraded.
+    fn extract_hint_meta(
+        &self,
+        b: &ExtractBinding,
+        fields: &[ValidatedField],
+        fallback_reads: &BTreeMap<String, Vec<String>>,
+        hints: &BTreeSet<(String, Option<String>)>,
+    ) -> Meta {
+        let mut out = BTreeMap::new();
+        for field in fields {
+            let name = &field.evidence.name;
+            let reads: Vec<_> = fallback_reads
+                .get(name)
+                .unwrap_or(&b.projection)
+                .iter()
+                .filter_map(|r| quality::whole_read(r))
+                .collect();
+            let hint = || ValueMeta {
+                grade: ValueGrade::Hint,
+                ..grading::combine_reads(&reads, &self.metas, Basis::Computed)
+            };
+            let mut meta = ValueMeta::ungraded(Basis::Computed);
+            match &field.value {
+                None | Some(Value::Null) => {}
+                Some(_) if hints.contains(&(name.clone(), None)) => meta = hint(),
+                Some(Value::Record(record)) => {
+                    let subs: BTreeMap<_, _> = record
+                        .iter()
+                        .filter(|(sub, v)| {
+                            !matches!(v, Value::Null)
+                                && hints.contains(&(name.clone(), Some((*sub).clone())))
+                        })
+                        .map(|(sub, _)| (sub.clone(), hint()))
+                        .collect();
+                    if !subs.is_empty() {
+                        meta.grade = ValueGrade::Hint;
+                        meta.fields = Some(subs);
+                    }
+                }
+                Some(_) => {}
+            }
+            out.insert(name.clone(), meta);
+        }
+        let mut whole = ValueMeta::ungraded(Basis::Computed);
+        whole.grade = out
+            .values()
+            .fold(ValueGrade::Ungraded, |g, m| g.combine(m.grade));
+        whole.fields = Some(out);
+        Meta {
+            whole,
+            node: ValueGrade::Ungraded,
+        }
     }
 
     pub(super) fn eval_accept(&mut self, id: &str, a: &AcceptModelDerived) {

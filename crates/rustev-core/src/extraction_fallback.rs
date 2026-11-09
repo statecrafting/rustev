@@ -3,12 +3,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rustev_contract::{
     Document,
-    definition::{InputDecl, TypeDecl},
+    definition::{InputDecl, ProvenanceClass, TypeDecl},
     extraction::{
         AbsenceReason as Reason, Distributions, Extract, ExtractionSchema, ExtractionType, Fill,
     },
     extraction_documents::{
-        DateFormat, ExtractRules, ExtractionCondition as Condition, ExtractionValue as Expr,
+        DateFormat, ExtractRules, ExtractionCondition as Condition, ExtractionValue as Expr, Scalar,
     },
     extraction_results::{ExtractionFieldEvidence, ExtractionOrigin},
     judgment::Derivation,
@@ -24,6 +24,12 @@ use crate::extraction_validate::{self, ValidatedField, fallback_derivation};
 pub enum Source<'a> {
     Readable {
         bytes: &'a [u8],
+        derivation: Derivation,
+    },
+    /// An `integer`, `bool` or `enum` input value, which only an `equals` or
+    /// `one_of` condition reads (spec 070, 3.4). An enum is its option text.
+    Exact {
+        value: &'a Scalar,
         derivation: Derivation,
     },
     Unavailable,
@@ -62,19 +68,21 @@ pub fn bind_in(
     // Reuse document-local checks even for directly constructed Rust values.
     let bytes = serde_json::to_vec(program).map_err(|e| e.to_string())?;
     let program = ExtractRules::parse(&bytes).map_err(|e| e.to_string())?;
-    // Spec 070 increment 2a binds the token and date extractors; the
-    // exact-value conditions and vocabulary capture follow in 2b.
-    if let Some(member) = program
-        .fields
-        .iter()
-        .flat_map(|f| &f.rules)
-        .find_map(|r| v2_condition(&r.when).or_else(|| v2_value(&r.then)))
-    {
-        return Err(format!("{member} is not supported by this build"));
+    // Spec 070, 3.4.2: a source read only by exact-value conditions need
+    // not be projected, because only the core reads it.
+    let mut text_read = BTreeSet::new();
+    let mut exact_read = BTreeSet::new();
+    for r in program.fields.iter().flat_map(|f| &f.rules) {
+        condition_reads(&r.when, &mut text_read, &mut exact_read);
+        value_sources(&r.then, &mut text_read);
     }
     let mut names = BTreeSet::new();
     for s in &program.sources {
-        if !step.projection.contains(&s.reference) || !s.reference.starts_with("input:") {
+        let core_only =
+            exact_read.contains(s.name.as_str()) && !text_read.contains(s.name.as_str());
+        if (!core_only && !step.projection.contains(&s.reference))
+            || !s.reference.starts_with("input:")
+        {
             return Err(format!("source {} is not in the input projection", s.name));
         }
         if !names.insert(s.name.as_str()) {
@@ -101,6 +109,8 @@ pub fn bind_in(
                 return Err(format!("undeclared source {s}"));
             }
             extractors_v2(&program, &rule.then, inputs)?;
+            exact_conditions(&program, &rule.when, inputs)?;
+            vocabulary_values(&rule.then, &declared.ty, step)?;
             if let ExtractionType::List { item, .. } = &declared.ty {
                 let Expr::Literal(v) = &rule.then else {
                     return Err(format!("list field {} requires literal items", f.field));
@@ -148,29 +158,15 @@ fn value_type(v: &Expr, ty: &ExtractionType) -> bool {
         (Expr::IntegerAfter { .. }, ExtractionType::Integer { .. })
         | (Expr::DateIso { .. }, ExtractionType::Date {})
         | (Expr::TokenAfter { .. } | Expr::TokenMatching { .. }, ExtractionType::Text { .. })
-        | (Expr::Date { .. }, ExtractionType::Date {}) => true,
+        | (Expr::Date { .. }, ExtractionType::Date {})
+        | (Expr::VocabularyAfter { .. }, ExtractionType::Text { .. }) => true,
+        (Expr::VocabularyAfter { vocabulary, .. }, ExtractionType::Enum { vocabulary: v }) => {
+            vocabulary == v
+        }
         (Expr::Record(values), ExtractionType::Record { fields }) => values
             .iter()
             .all(|(n, v)| fields.iter().any(|f| f.name == *n && value_type(v, &f.ty))),
         _ => false,
-    }
-}
-
-fn v2_condition(c: &Condition) -> Option<&'static str> {
-    match c {
-        Condition::Always | Condition::ContainsAny { .. } | Condition::ContainsAll { .. } => None,
-        Condition::All(cs) | Condition::Any(cs) => cs.iter().find_map(v2_condition),
-        Condition::Not(c) => v2_condition(c),
-        Condition::Equals { .. } => Some("equals"),
-        Condition::OneOf { .. } => Some("one_of"),
-    }
-}
-fn v2_value(v: &Expr) -> Option<&'static str> {
-    match v {
-        Expr::Literal(_) | Expr::IntegerAfter { .. } | Expr::DateIso { .. } => None,
-        Expr::Record(vs) => vs.values().find_map(v2_value),
-        Expr::TokenAfter { .. } | Expr::TokenMatching { .. } | Expr::Date { .. } => None,
-        Expr::VocabularyAfter { .. } => Some("vocabulary_after"),
     }
 }
 
@@ -246,22 +242,131 @@ fn extractors_v2(program: &ExtractRules, v: &Expr, inputs: &[InputDecl]) -> Resu
 }
 
 fn condition_sources<'a>(c: &'a Condition, out: &mut BTreeSet<&'a str>) {
+    let mut exact = BTreeSet::new();
+    condition_reads(c, out, &mut exact);
+    out.extend(exact);
+}
+
+/// The sources text conditions read, and those exact-value conditions read.
+fn condition_reads<'a>(
+    c: &'a Condition,
+    text: &mut BTreeSet<&'a str>,
+    exact: &mut BTreeSet<&'a str>,
+) {
     match c {
         Condition::Always => {}
-        Condition::ContainsAny { source, .. }
-        | Condition::ContainsAll { source, .. }
-        | Condition::Equals { source, .. }
-        | Condition::OneOf { source, .. } => {
-            out.insert(source);
+        Condition::ContainsAny { source, .. } | Condition::ContainsAll { source, .. } => {
+            text.insert(source);
+        }
+        Condition::Equals { source, .. } | Condition::OneOf { source, .. } => {
+            exact.insert(source);
         }
         Condition::All(cs) | Condition::Any(cs) => {
             for c in cs {
-                condition_sources(c, out);
+                condition_reads(c, text, exact);
             }
         }
-        Condition::Not(c) => condition_sources(c, out),
+        Condition::Not(c) => condition_reads(c, text, exact),
     }
 }
+
+/// Spec 070, 3.4.2 and 3.5.2: an exact-value condition reads a non-nullable
+/// `text`, `integer`, `bool` or `enum` input or record field whose accepted
+/// provenance excludes `model-derived`, and every value is of its type (an
+/// enum value one of its options).
+fn exact_conditions(
+    program: &ExtractRules,
+    c: &Condition,
+    inputs: &[InputDecl],
+) -> Result<(), String> {
+    let (source, values) = match c {
+        Condition::Always | Condition::ContainsAny { .. } | Condition::ContainsAll { .. } => {
+            return Ok(());
+        }
+        Condition::All(cs) | Condition::Any(cs) => {
+            return cs
+                .iter()
+                .try_for_each(|c| exact_conditions(program, c, inputs));
+        }
+        Condition::Not(c) => return exact_conditions(program, c, inputs),
+        Condition::Equals { source, value } => (source, std::slice::from_ref(value)),
+        Condition::OneOf { source, values } => (source, values.as_slice()),
+    };
+    let reference = program
+        .sources
+        .iter()
+        .find(|s| s.name == *source)
+        .map(|s| s.reference.as_str())
+        .unwrap_or_default();
+    let input = reference
+        .strip_prefix("input:")
+        .map(|p| p.split('/').next().unwrap_or(p))
+        .and_then(|name| inputs.iter().find(|i| i.name == name));
+    if input.is_none_or(|i| i.provenance.contains(&ProvenanceClass::ModelDerived)) {
+        return Err(format!(
+            "condition source {source} is not an input that excludes model-derived"
+        ));
+    }
+    let fits = |v: &Scalar| match (input_type(inputs, reference), v) {
+        (Some(TypeDecl::Text { .. }), Scalar::Text(_))
+        | (Some(TypeDecl::Integer), Scalar::Integer(_))
+        | (Some(TypeDecl::Bool), Scalar::Bool(_)) => true,
+        (Some(TypeDecl::Enum { options }), Scalar::Text(t)) => options.contains(t),
+        _ => false,
+    };
+    if let Some(v) = values.iter().find(|v| !fits(v)) {
+        return Err(format!(
+            "condition value {v:?} does not fit the type of source {source}"
+        ));
+    }
+    Ok(())
+}
+
+/// Spec 070, 3.5.5: `vocabulary_after` names a vocabulary the step declares;
+/// its field type is checked with the other values.
+fn vocabulary_values(v: &Expr, ty: &ExtractionType, step: &Extract) -> Result<(), String> {
+    match (v, ty) {
+        (Expr::VocabularyAfter { vocabulary, .. }, _) => {
+            if !step.vocabularies.contains_key(vocabulary) {
+                return Err(format!("undeclared vocabulary {vocabulary}"));
+            }
+            Ok(())
+        }
+        (Expr::Record(vs), ExtractionType::Record { fields }) => {
+            vs.iter()
+                .try_for_each(|(n, v)| match fields.iter().find(|f| f.name == *n) {
+                    Some(f) => vocabulary_values(v, &f.ty, step),
+                    None => Ok(()),
+                })
+        }
+        _ => Ok(()),
+    }
+}
+
+/// The paths of the extract fields a `vocabulary_after` rule can fill, as
+/// `(field, subfield)`: their values are graded `hint` (spec 070, 3.8.2).
+pub fn hint_paths(program: &ExtractRules) -> BTreeSet<(String, Option<String>)> {
+    let mut out = BTreeSet::new();
+    for f in &program.fields {
+        for r in &f.rules {
+            match &r.then {
+                Expr::VocabularyAfter { .. } => {
+                    out.insert((f.field.clone(), None));
+                }
+                Expr::Record(vs) => {
+                    for (n, v) in vs {
+                        if matches!(v, Expr::VocabularyAfter { .. }) {
+                            out.insert((f.field.clone(), Some(n.clone())));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
 fn value_sources<'a>(v: &'a Expr, out: &mut BTreeSet<&'a str>) {
     match v {
         Expr::Literal(_) => {}
@@ -283,6 +388,10 @@ fn value_sources<'a>(v: &'a Expr, out: &mut BTreeSet<&'a str>) {
 
 struct Reads<'a> {
     months: &'a BTreeMap<String, Vec<Vec<String>>>,
+    vocabularies: &'a BTreeMap<String, Vec<String>>,
+    /// A `vocabulary_after` rule was skipped because its vocabulary was
+    /// unavailable (spec 070, 3.3.5).
+    vocabulary_unavailable: bool,
     sources: &'a BTreeMap<String, Source<'a>>,
     references: &'a BTreeMap<&'a str, &'a str>,
     max_bytes: u64,
@@ -303,6 +412,36 @@ impl<'a> Reads<'a> {
             }
             _ => Err(Reason::SourceUnavailable),
         }
+    }
+
+    /// An exact-value condition's read: the text bytes or the scalar value.
+    fn exact(&mut self, source: &str) -> Result<Exact<'a>, Reason> {
+        let reference = self
+            .references
+            .get(source)
+            .ok_or(Reason::SourceUnavailable)?;
+        match self.sources.get(*reference) {
+            Some(Source::Exact { value, derivation }) => {
+                self.read.insert((*reference).into(), *derivation);
+                Ok(Exact::Value(value))
+            }
+            Some(Source::Readable { .. }) => self.get(source).map(Exact::Text),
+            _ => Err(Reason::SourceUnavailable),
+        }
+    }
+}
+
+enum Exact<'a> {
+    Text(&'a [u8]),
+    Value(&'a Scalar),
+}
+
+/// Spec 070, 3.4.3: bytes with no folding, integers and booleans by value.
+fn equal(read: &Exact<'_>, v: &Scalar) -> bool {
+    match (read, v) {
+        (Exact::Text(bytes), Scalar::Text(t)) => *bytes == t.as_bytes(),
+        (Exact::Value(value), v) => *value == v,
+        _ => false,
     }
 }
 
@@ -340,10 +479,12 @@ fn condition(c: &Condition, reads: &mut Reads<'_>) -> Result<bool, Reason> {
             false
         }
         Condition::Not(c) => !condition(c, reads)?,
-        // Refused by `bind` in this build (spec 070 increment 1); never
-        // false, so an unbound condition can only leave the field absent.
-        Condition::Equals { .. } | Condition::OneOf { .. } => {
-            return Err(Reason::SourceUnavailable);
+        // An unreadable source ends the field's evaluation: never false
+        // (spec 070, 3.4.5).
+        Condition::Equals { source, value } => equal(&reads.exact(source)?, value),
+        Condition::OneOf { source, values } => {
+            let read = reads.exact(source)?;
+            values.iter().any(|v| equal(&read, v))
         }
     })
 }
@@ -435,9 +576,20 @@ fn value(v: &Expr, reads: &mut Reads<'_>) -> Result<Option<Json>, Reason> {
                 .map_or(&[][..], Vec::as_slice);
             crate::extraction_match::date(text, *format, table, *occurrence).map(Json::String)
         }
-        // `bind` refuses this until spec 070 increment 2b; like the
-        // condition arms, an unbound value leaves the field unavailable.
-        Expr::VocabularyAfter { .. } => return Err(Reason::SourceUnavailable),
+        Expr::VocabularyAfter {
+            source,
+            terms,
+            vocabulary,
+        } => {
+            let text = reads.get(source)?;
+            let Some(options) = reads.vocabularies.get(vocabulary) else {
+                reads.vocabulary_unavailable = true;
+                return Ok(None);
+            };
+            crate::extraction_match::word_after(text, terms)
+                .filter(|w| options.iter().any(|o| o == w))
+                .map(Json::String)
+        }
     })
 }
 
@@ -464,6 +616,8 @@ impl BoundProgram {
             .map(|field| {
                 let mut reads = Reads {
                     months: &months,
+                    vocabularies,
+                    vocabulary_unavailable: false,
                     sources,
                     references: &references,
                     max_bytes: max_projection_bytes,
@@ -485,7 +639,11 @@ impl BoundProgram {
                         }
                     }
                     if items.is_empty() {
-                        Err(Reason::FallbackNoMatch)
+                        Err(if reads.vocabulary_unavailable {
+                            Reason::VocabularyUnavailable
+                        } else {
+                            Reason::FallbackNoMatch
+                        })
                     } else {
                         Ok(Json::Array(items))
                     }
