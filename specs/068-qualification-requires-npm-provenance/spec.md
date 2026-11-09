@@ -2,7 +2,7 @@
 id: "068-qualification-requires-npm-provenance"
 title: "Qualification requires npm provenance after 0.5.0 (amends 031, 056 and 058)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-11-07"
 summary: >
   An amendment of approved specs 031 (3.9.6, 3.9.7 (b)), 056 (3.3)
@@ -28,6 +28,9 @@ extends:
   # The qualification harness, its README and tests, and the step-evidence
   # check of `rustev-release qualify` (3.3.3).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: amending }
+  # At completion, 068 joins VERIFIED_SPECS and an acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "031-public-api-and-release-family"
   - "056-release-0-1-1-and-consumer-qualification"
@@ -335,6 +338,29 @@ request; later parts append here and do not edit this list:
   `@rustev/rustev-wasm` 0.6.0, and would refuse both at 0.5.0, which
   carry no provenance; hence 3.3.1.
 - No workflow edit: `qualify.yml` and `release.yml` are unchanged (2).
+
+**Closure (2026-11-09).**
+
+- Run 42589506807 of `qualify.yml`, dispatched on `main` with `tag:
+  v0.6.0` (the first release after 0.5.0) and
+  `harness_from_default_branch: true`, passed every step on all seven
+  platforms; each platform's npm step records `verified` for every
+  package (21 of 21), and `record` recorded `qualified`
+  (`qualification.json`, SHA-256 `4bd9cea9...e088`).
+- Run 42589511306, the same dispatch with `tag: v0.5.0`, passed every
+  step on all seven platforms; each npm step records `not_required` for
+  every package (21 of 21), and `record` recorded `qualified`
+  (`qualification.json`, SHA-256 `4b0a514f...bb06`).
+- The release run of `v0.7.0` (run 42553332074) qualified through the
+  same rule, `verified` for every package on all seven platforms.
+- The first dispatches (runs 42564690022 and 42564691757) passed every
+  step and failed in `record`, which ran the tag's `rustev-release`,
+  older than the `npm_provenance` member; #581 (056 3.5) has `record`
+  use the default branch's tool when the dispatch takes its harness.
+  This spec's own text is unchanged by that fix.
+- 068 joins `VERIFIED_SPECS` in the `Makefile` and the
+  `integrations-plans` acceptance group in `scripts/acceptance/verify.py`.
+  This spec's acceptance is met.
 
 ## Decisions at approval
 

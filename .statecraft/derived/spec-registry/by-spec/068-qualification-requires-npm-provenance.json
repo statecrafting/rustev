@@ -20,10 +20,26 @@
           "kind": "directory",
           "path": "tools/rustev-release/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "068-qualification-requires-npm-provenance",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-2-the-provenance-rule",
@@ -54,7 +70,7 @@
       }
     ],
     "sectionDigests": {
-      "068-qualification-requires-npm-provenance-after-0-5-0-amends-031-056-and-058": "a9af7e08fccf7648a8c21e6833708cf61313c45a47dd2d860f11b2cf1a21d146",
+      "068-qualification-requires-npm-provenance-after-0-5-0-amends-031-056-and-058": "837d7413294e66c2888dac51cb091f62824c1888c1cad69336260eb3deaba1e2",
       "1-purpose": "69ee32eb375858a53d97fb1a1d6720150c6baa03922b26d919d2c1e2fc21d446",
       "2-1-binding-principles": "6566942fbf0a4e305556981bb9d8867b1153a140fe4f11bff618648971c97239",
       "2-territory": "6250f17dd27324462fa26f30cbd9e3ebc29aef49b4bcc8c822b6183f14ffc987",
@@ -68,7 +84,7 @@
       "5-observable-negative-cases": "c890d38e082cd5e6c504093c2f3d5f5daeec01431f9ab331ff502fbb8bfaade0",
       "acceptance": "66ee3d136af50891edd54cbd9101330f3500bef7fcff3b8834e71255612892e9",
       "decisions-at-approval": "536015c0458768ef00f85db59d9e404f5fcfa68cd008d6fc2d2a95c271a1978a",
-      "implementation-record": "fedbb6ec5b804638e5bd883a95713e2a70c1253e91791b5bea3d1c86276bd2d6",
+      "implementation-record": "0e4bebccb4b1ad0e1546edd5f65abb61e632904783d5665430272e27e6e11c6d",
       "verification": "6d1c42cfd3006987a8f018b601ea85a2ece22cc9351a298316dc41b940ec12fe"
     },
     "sectionHeadings": [
@@ -94,6 +110,6 @@
     "summary": "An amendment of approved specs 031 (3.9.6, 3.9.7 (b)), 056 (3.3) and 058 (3.4.2), for #559, ratified by the owner on 2026-11-08 (A-88). Owner decision A-87 (#555) makes every npm package of a release after 0.5.0 carry npm provenance and refuses an unattested version at publication, but the fresh-consumer qualification still follows A-74: its npm step accepts a verified registry signature in place of provenance, so a later version without provenance would still be recorded `qualified`. This spec makes the npm step require, for every release version after 0.5.0, an SLSA build-provenance attestation on each installed `@rustev/*` package, verified by npm and bound to this repository's release workflow at the release tag. Versions 0.1.0 to 0.5.0 keep A-74's rule, so the default-branch harness can still requalify them. It records, without specifying, the removal of A-87's `NPM_TOKEN` fallback once npm fixes npm/cli#9969 and one release has published through trusted publishing alone.\n",
     "title": "Qualification requires npm provenance after 0.5.0 (amends 031, 056 and 058)"
   },
-  "shardHash": "a48cff86958c0b40b8914d2cbf97f1da04b358a6c69e0668657af3f21917c819",
+  "shardHash": "2e937440974393aca4058a5c6df769b782e6f1b687054e9644a022f0123483cf",
   "specVersion": "1.11.0"
 }

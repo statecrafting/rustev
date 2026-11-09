@@ -12,11 +12,32 @@
     ],
     "implementingPaths": [
       {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/acceptance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "scripts/acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      },
       {
         "locations": [
           {
@@ -28,6 +49,19 @@
         "unit": {
           "kind": "directory",
           "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
         }
       },
       {
@@ -48,5 +82,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "a48cff86958c0b40b8914d2cbf97f1da04b358a6c69e0668657af3f21917c819"
+  "shardHash": "2e937440974393aca4058a5c6df769b782e6f1b687054e9644a022f0123483cf"
 }
