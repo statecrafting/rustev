@@ -395,3 +395,15 @@ and its `record` job's `rustev-release qualify` recorded the lifecycle
 six platforms and failed `npm` on win32-x64-msvc, fixed by #463. With the
 version command, the declared examples and a qualified later release, this
 spec's acceptance is met.
+
+**The record with the default-branch harness (2026-11-08, 3.5, A-74).**
+With `harness_from_default_branch`, the `record` job of
+`.github/workflows/qualify.yml` now also checks out the default branch into
+`harness/` and runs that branch's `rustev-release qualify` on the tag's
+release files and the platforms' evidence. It had run the tag's tool, which
+can predate a field the default branch's `qualify.sh` records: the
+dispatches of 2026-11-08 for `v0.6.0` (run 42564690022) and `v0.5.0` (run
+42564691757) passed every step on all seven platforms, then `record`
+refused the evidence's `npm_provenance` field (spec 068) with the tag's
+tool. Without the input, and in the release run's call, `record` is
+unchanged and runs the tag's tool.

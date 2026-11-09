@@ -194,6 +194,15 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
+      # A dispatch with the default branch's harness also records with that
+      # branch's `rustev-release`, which reads the evidence its `qualify.sh`
+      # wrote (056 3.5); the tag's tool may predate a field it records.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: ${{ inputs.harness_from_default_branch }}
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: harness
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: qualify-*
@@ -201,6 +210,8 @@ jobs:
           merge-multiple: true
       - name: Record the lifecycle from the run's release (058 3.4.2)
         id: record
+        env:
+          FROM_DEFAULT: ${{ inputs.harness_from_default_branch }}
         run: |
           set -eu
           if ! gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx publication.json; then
@@ -209,7 +220,12 @@ jobs:
           fi
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
           gh release download "$TAG" -p release-manifest.json -p SHA256SUMS -p publication.json -D release
-          cargo run --quiet --locked -p rustev-release -- qualify release evidence > qualification.json
+          if [ "$FROM_DEFAULT" = true ]; then
+            git -C harness fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            (cd harness && cargo run --quiet --locked -p rustev-release -- qualify ../release ../evidence) > qualification.json
+          else
+            cargo run --quiet --locked -p rustev-release -- qualify release evidence > qualification.json
+          fi
           cat qualification.json
           echo "qualified=true" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

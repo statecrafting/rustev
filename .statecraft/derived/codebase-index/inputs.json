@@ -10,7 +10,7 @@
       "contentHash": "1783ca47d506131fb7c3c2c46f952d0dfddbe614d3396757313f0d066621222c"
     },
     ".github/workflows/qualify.yml": {
-      "contentHash": "fa8449648fe8406aa12e3aff653271d96fc37b28671d360f6edf217807398d42"
+      "contentHash": "a8be39f18537ff8c9a2204ce731ba57e165602b8d0848d86b9e7e9569d735449"
     },
     ".github/workflows/release-checks.yml": {
       "contentHash": "1a5d827da3ca69ee20e21a7443d87d2a68db83d877ffdb40b712f5b05381dbc4"
