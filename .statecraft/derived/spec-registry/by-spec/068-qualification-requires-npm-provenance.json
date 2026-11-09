@@ -20,6 +20,22 @@
           "kind": "directory",
           "path": "tools/rustev-release/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "068-qualification-requires-npm-provenance",
@@ -94,6 +110,6 @@
     "summary": "An amendment of approved specs 031 (3.9.6, 3.9.7 (b)), 056 (3.3) and 058 (3.4.2), for #559, ratified by the owner on 2026-11-08 (A-88). Owner decision A-87 (#555) makes every npm package of a release after 0.5.0 carry npm provenance and refuses an unattested version at publication, but the fresh-consumer qualification still follows A-74: its npm step accepts a verified registry signature in place of provenance, so a later version without provenance would still be recorded `qualified`. This spec makes the npm step require, for every release version after 0.5.0, an SLSA build-provenance attestation on each installed `@rustev/*` package, verified by npm and bound to this repository's release workflow at the release tag. Versions 0.1.0 to 0.5.0 keep A-74's rule, so the default-branch harness can still requalify them. It records, without specifying, the removal of A-87's `NPM_TOKEN` fallback once npm fixes npm/cli#9969 and one release has published through trusted publishing alone.\n",
     "title": "Qualification requires npm provenance after 0.5.0 (amends 031, 056 and 058)"
   },
-  "shardHash": "37009f3433314a67fc5bc442824a9e8b76f44a14e247f10d8c623c34592a9ba2",
+  "shardHash": "2e937440974393aca4058a5c6df769b782e6f1b687054e9644a022f0123483cf",
   "specVersion": "1.11.0"
 }

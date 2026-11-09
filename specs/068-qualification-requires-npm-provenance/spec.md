@@ -28,6 +28,9 @@ extends:
   # The qualification harness, its README and tests, and the step-evidence
   # check of `rustev-release qualify` (3.3.3).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: amending }
+  # At completion, 068 joins VERIFIED_SPECS and an acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "031-public-api-and-release-family"
   - "056-release-0-1-1-and-consumer-qualification"
