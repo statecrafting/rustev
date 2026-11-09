@@ -22,6 +22,7 @@ ignore = [
   { id = "RUSTSEC-2025-0057", reason = "fxhash unmaintained; via ptr_hash in tk-encode, rustev-backend-embed-linear only. Revisit by 2027-02-05." },
   { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic start tags; via s3-simple in rustev-aicortex and rustev-rahi only, parsing the configured storage endpoint's responses. Revisit by 2027-02-05." },
   { id = "RUSTSEC-2026-0195", reason = "quick-xml namespace allocation; via s3-simple in rustev-aicortex and rustev-rahi only, parsing the configured storage endpoint's responses. Revisit by 2027-02-05." },
+  { id = "RUSTSEC-2026-0459", reason = "bundled SQLite before 3.54.0 (uninitialized page cache on a crafted database and -wal pair, local); libsqlite3-sys 0.38 via rusqlite 0.40 and hiqlite-patched in rustev-aicortex and rustev-rahi only, which open their own store; no hiqlite-patched on rusqlite 0.41 yet. Owner accepted 2026-11-09. Revisit by 2027-02-05." },
 ]
 
 [licenses]
