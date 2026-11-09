@@ -15934,6 +15934,272 @@
     },
     {
       "command": "decide",
+      "id": "runtime.rules-first-partial",
+      "inputs": [
+        {
+          "name": "capture-rules-first-partial.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-rules-first-partial.snapshot.json",
+          "sha256": "93ec48320321c9d055206c46f605fe9f334045bf4dd02555e6dc63d9f1a43ac8"
+        },
+        {
+          "name": "capture-rules-first.descriptor.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-rules-first.descriptor.json",
+          "sha256": "fae48047965b3401f83f4294e3f4b134315d3168c5b8d313c0cc10ea98dfeac1"
+        },
+        {
+          "name": "capture-rules-first.plan.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-rules-first.plan.json",
+          "sha256": "7f100da42cff699ddf3270c498f4ec992153915c02d03a9370063e91bd6d45ac"
+        }
+      ],
+      "mirrors": "crates/rustev-runtime/tests/extraction.rs",
+      "outputs": [
+        {
+          "file": "embedded.bundle.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-partial/embedded.bundle.json",
+          "normalize": [],
+          "sha256": "3015ccac31401aba075036ccf6e74120c5a1592a4510ebbe18e0eab72f79ede4"
+        },
+        {
+          "file": "embedded.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-partial/embedded.record.json",
+          "normalize": [],
+          "sha256": "cf3648b7544c5a00f137ee1463756c25019550a48fc61a4ac88c906f1647eb89"
+        },
+        {
+          "file": "embedded.replay.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-partial/embedded.replay.json",
+          "normalize": [],
+          "sha256": "04b1d4987366aa029b170b19f7394ae794e7d5daf25a89c74ed532dcca5aaa8a"
+        },
+        {
+          "file": "embedded.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-partial/embedded.result.json",
+          "normalize": [],
+          "sha256": "a0c5d9c5e45bd7c7f3892bf3a29726e5136c2a0e06a0abe971e563c5f271b3c5"
+        }
+      ],
+      "runtime": {
+        "backends": [
+          {
+            "answers": {
+              "*": [
+                {
+                  "output": {
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "output": {
+                      "typed_record": {
+                        "fields": {
+                          "features": [
+                            "pool"
+                          ],
+                          "insufficient": false,
+                          "party_size": 4,
+                          "window": {
+                            "end": "2027-01-03",
+                            "start": "2027-01-01"
+                          }
+                        },
+                        "logprobs": [],
+                        "provider_reported": {}
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "cost_bound": {
+              "bounded": {
+                "max_units": 1
+              }
+            },
+            "cost_model": "bounded",
+            "descriptor": "capture-rules-first.descriptor.json",
+            "max_concurrency": 8,
+            "on_cancel": "ignore",
+            "on_release": {},
+            "remote": "finished"
+          }
+        ],
+        "calibrations": [],
+        "capture": {
+          "created_at_ms": 1790164800000,
+          "max_bytes": 16777216,
+          "retain": {
+            "embedded": "embedded"
+          },
+          "scope": {
+            "context_revision": "revision",
+            "mode": "principal",
+            "principal_scope": "scope",
+            "tenant": "tenant"
+          }
+        },
+        "config": {
+          "max_in_flight": 2,
+          "max_parallel_requests": 1,
+          "max_queued": 0,
+          "sink_timeout_ms": 1000
+        },
+        "descriptors": [
+          "capture-rules-first.descriptor.json"
+        ],
+        "drive": [
+          "start"
+        ],
+        "plan": "capture-rules-first.plan.json",
+        "requests": [
+          {
+            "decision_id": "embedded",
+            "evaluation_time_ms": 1790164800000,
+            "snapshot": "capture-rules-first-partial.snapshot.json"
+          }
+        ]
+      },
+      "surfaces": [
+        "rust-api",
+        "native"
+      ]
+    },
+    {
+      "command": "decide",
+      "id": "runtime.rules-first-skipped",
+      "inputs": [
+        {
+          "name": "capture-rules-first-skipped.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-rules-first-skipped.snapshot.json",
+          "sha256": "7ec10dbfdd8cd0039fdb982b4284c5f475a0a0bd9e9e2e0227e586196a5ab1fa"
+        },
+        {
+          "name": "capture-rules-first.descriptor.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-rules-first.descriptor.json",
+          "sha256": "fae48047965b3401f83f4294e3f4b134315d3168c5b8d313c0cc10ea98dfeac1"
+        },
+        {
+          "name": "capture-rules-first.plan.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-rules-first.plan.json",
+          "sha256": "7f100da42cff699ddf3270c498f4ec992153915c02d03a9370063e91bd6d45ac"
+        }
+      ],
+      "mirrors": "crates/rustev-runtime/tests/extraction.rs",
+      "outputs": [
+        {
+          "file": "embedded.bundle.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-skipped/embedded.bundle.json",
+          "normalize": [],
+          "sha256": "1c84d88bb8432695f28d06581e1ac76cf78f0d433caeea9c72f3afc462005bde"
+        },
+        {
+          "file": "embedded.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-skipped/embedded.record.json",
+          "normalize": [],
+          "sha256": "9ef7c56ffc0c9d6c4c1cedaee67525df10a1f5714d82c0151afbc1344f2135d6"
+        },
+        {
+          "file": "embedded.replay.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-skipped/embedded.replay.json",
+          "normalize": [],
+          "sha256": "29900f7422ef66517836aebc5a0603eaaf46054c09111d1972f6e23bfb4422ee"
+        },
+        {
+          "file": "embedded.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-skipped/embedded.result.json",
+          "normalize": [],
+          "sha256": "a0c5d9c5e45bd7c7f3892bf3a29726e5136c2a0e06a0abe971e563c5f271b3c5"
+        }
+      ],
+      "runtime": {
+        "backends": [
+          {
+            "answers": {
+              "*": [
+                {
+                  "output": {
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "output": {
+                      "typed_record": {
+                        "fields": {
+                          "features": [
+                            "pool"
+                          ],
+                          "insufficient": false,
+                          "party_size": 4,
+                          "window": {
+                            "end": "2027-01-03",
+                            "start": "2027-01-01"
+                          }
+                        },
+                        "logprobs": [],
+                        "provider_reported": {}
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "cost_bound": {
+              "bounded": {
+                "max_units": 1
+              }
+            },
+            "cost_model": "bounded",
+            "descriptor": "capture-rules-first.descriptor.json",
+            "max_concurrency": 8,
+            "on_cancel": "ignore",
+            "on_release": {},
+            "remote": "finished"
+          }
+        ],
+        "calibrations": [],
+        "capture": {
+          "created_at_ms": 1790164800000,
+          "max_bytes": 16777216,
+          "retain": {
+            "embedded": "embedded"
+          },
+          "scope": {
+            "context_revision": "revision",
+            "mode": "principal",
+            "principal_scope": "scope",
+            "tenant": "tenant"
+          }
+        },
+        "config": {
+          "max_in_flight": 2,
+          "max_parallel_requests": 1,
+          "max_queued": 0,
+          "sink_timeout_ms": 1000
+        },
+        "descriptors": [
+          "capture-rules-first.descriptor.json"
+        ],
+        "drive": [
+          "start"
+        ],
+        "plan": "capture-rules-first.plan.json",
+        "requests": [
+          {
+            "decision_id": "embedded",
+            "evaluation_time_ms": 1790164800000,
+            "snapshot": "capture-rules-first-skipped.snapshot.json"
+          }
+        ]
+      },
+      "surfaces": [
+        "rust-api",
+        "native"
+      ]
+    },
+    {
+      "command": "decide",
       "id": "runtime.store-failure-policy",
       "inputs": [
         {

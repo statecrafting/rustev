@@ -1381,3 +1381,175 @@ fn capture_acquire_case() {
         &line(serde_json::to_vec_pretty(&c).unwrap()),
     );
 }
+
+// ---- spec 070 3.7.6: rules-first extraction cases ------------------------
+
+/// A skipped and a partial `rules_first` request, mirroring
+/// `crates/rustev-runtime/tests/extraction.rs`: the skipped one is never
+/// dispatched or captured, the partial one runs through the driver and its
+/// capture replays.
+#[test]
+fn rules_first_cases() {
+    use rustev_contract::definition::{Operation, StepBody};
+    use rustev_contract::descriptor::{OutputKind, TextStructure};
+    use rustev_contract::plan::{Plan, PlanStepDetail};
+    let plan: Plan = serde_json::from_str(include_str!(
+        "../../../crates/rustev-core/tests/golden/acceptance.plan.json"
+    ))
+    .unwrap();
+    let PlanStepDetail::Extract(b) = &plan.steps[0].detail else {
+        panic!()
+    };
+    let template = b.template.clone();
+    let mut definition = plan.definition.clone();
+    let StepBody::Extract(e) = &mut definition.steps[0].body else {
+        panic!()
+    };
+    e.fallback = serde_json::from_value(json!({"rules_program":"booking@1","fill":"rules_first",
+        "required":["party_size","area_name"]}))
+    .unwrap();
+    let rules = serde_json::from_value(
+        json!({"schema":"rustev.extract-rules/2","name":"booking","version":"1",
+        "sources":[{"name":"text","ref":"input:message"}],
+        "fields":[
+            {"field":"party_size","rules":[{"name":"party","when":"always",
+                "then":{"integer_after":{"source":"text","terms":["party"],"max_digits":2}}}]},
+            {"field":"area_name","rules":[{"name":"area","when":"always",
+                "then":{"token_after":{"source":"text","terms":["area"],"charset":["upper","lower"],
+                    "min_len":2,"max_len":32}}}]}]}),
+    )
+    .unwrap();
+    let mut backend = linear_head();
+    backend.operations = vec![support(
+        Operation::Extract,
+        OutputKind::TypedRecord {
+            structure: TextStructure::JsonSchema,
+            max_output_bytes: 65536,
+            max_options: 32,
+            option_logprobs: true,
+        },
+        32,
+    )];
+    let compiled = rustev_core::compile::compile_with_extraction_documents(
+        &definition,
+        std::slice::from_ref(&backend),
+        &[],
+        &[],
+        None,
+        &[template],
+        &[rules],
+    )
+    .unwrap();
+    let mut fx = BTreeMap::new();
+    fx.insert(
+        "capture-rules-first.plan.json".to_string(),
+        line(compiled.canonical()),
+    );
+    fx.insert(
+        "capture-rules-first.descriptor.json".to_string(),
+        line(backend.canonical().unwrap()),
+    );
+    for (name, message) in [
+        (
+            "capture-rules-first-skipped.snapshot.json",
+            "party 4 area Soho",
+        ),
+        (
+            "capture-rules-first-partial.snapshot.json",
+            "party area Soho",
+        ),
+    ] {
+        let s = snapshot(vec![entry(
+            "message",
+            json!(message),
+            rustev_contract::definition::ProvenanceClass::SystemOfRecord,
+            NOW,
+        )]);
+        fx.insert(name.to_string(), line(s.canonical().unwrap()));
+    }
+    for (name, bytes) in &fx {
+        keep(&format!("fixtures/{}", fixture(name)), bytes);
+    }
+    for skipped in [true, false] {
+        let (id, snap) = if skipped {
+            (
+                "runtime.rules-first-skipped",
+                "capture-rules-first-skipped.snapshot.json",
+            )
+        } else {
+            (
+                "runtime.rules-first-partial",
+                "capture-rules-first-partial.snapshot.json",
+            )
+        };
+        let mut req = request("embedded", None);
+        req["snapshot"] = json!(snap);
+        let block = json!({
+            "plan": "capture-rules-first.plan.json",
+            "descriptors": ["capture-rules-first.descriptor.json"],
+            // Every runner reads the member, so it is given even when empty.
+            "calibrations": [],
+            "config": config(2, 0, 1),
+            "backends": [{
+                "descriptor": "capture-rules-first.descriptor.json",
+                "max_concurrency": 8, "cost_model": "bounded",
+                "cost_bound": { "bounded": { "max_units": 1 } },
+                "remote": "finished", "on_cancel": "ignore", "on_release": {},
+                "answers": {"*": [{"output":{"output":{"typed_record":{
+                    "fields":{"window":{"start":"2027-01-01","end":"2027-01-03"},
+                        "party_size":4,"features":["pool"],"insufficient":false},
+                    "logprobs":[],"provider_reported":{}}},
+                    "charge":{"observed":{"units":1}}}}]}
+            }],
+            "requests": [req],
+            "drive": ["start"],
+            "capture": {"scope": {"mode":"principal","tenant":"tenant","context_revision":"revision","principal_scope":"scope"},
+                "max_bytes":16777216, "created_at_ms":NOW, "retain":{"embedded":"embedded"}}
+        });
+        let case: RuntimeCase = serde_json::from_value(block.clone()).unwrap();
+        let mut names = vec![case.plan.clone()];
+        names.extend(case.descriptors.clone());
+        names.extend(case.requests.iter().map(|r| r.snapshot.clone()));
+        names.sort();
+        names.dedup();
+        let inputs = names.iter().map(|n| (n.clone(), fx[n].clone())).collect();
+        let out = runtime::run(&case, &inputs).unwrap();
+        let mut outputs = vec![];
+        for (file, bytes) in out {
+            let v: Json = serde_json::from_slice(&bytes).unwrap();
+            if file.ends_with("record.json") {
+                let x = &v["core"]["recorded"]["extraction"][0];
+                if skipped {
+                    assert_eq!(v["requests"], json!([]));
+                    assert_eq!(
+                        x["request_outcome"],
+                        json!({"skipped":{"reason":"rules_filled"}})
+                    );
+                } else {
+                    assert_eq!(v["requests"].as_array().unwrap().len(), 1);
+                    assert_eq!(x["request_outcome"], json!("succeeded"));
+                }
+            }
+            if file.ends_with("bundle.json") {
+                assert_eq!(
+                    v["supplies"].as_array().unwrap().len(),
+                    if skipped { 0 } else { 1 }
+                );
+            }
+            if file.ends_with("replay.json") {
+                assert_eq!(v["status"], "reproduced");
+            }
+            let rel = format!("expected/runtime/{id}/{file}");
+            keep(&rel, &bytes);
+            outputs.push(json!({"file":file,"golden":format!("{DIR}/{rel}"),"sha256":sha256_hex(&bytes),"normalize":[]}));
+        }
+        let c = json!({"id":id,"command":"decide","surfaces":["rust-api","native"],
+            "mirrors":"crates/rustev-runtime/tests/extraction.rs",
+            "inputs":names.iter().map(|n| json!({"name":n,"path":format!("{DIR}/fixtures/{}", fixture(n)),"sha256":sha256_hex(&fx[n])})).collect::<Vec<_>>(),
+            "runtime":block,"outputs":outputs});
+        keep(
+            &format!("cases/runtime/{id}.json"),
+            &line(serde_json::to_vec_pretty(&c).unwrap()),
+        );
+    }
+}

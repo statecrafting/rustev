@@ -13,6 +13,10 @@ pub(super) struct State {
     pub evidence: BTreeMap<String, ExtractionEvidence>,
     pub acceptance: BTreeMap<String, AcceptanceEvidence>,
     pub producers: Producers,
+    /// Spec 070, 3.7: the rules' fields of a `rules_first` step, kept from
+    /// when the rules run until the step completes, whether its request was
+    /// skipped or listed as a partial request.
+    rules_first: BTreeMap<String, Vec<crate::extraction_fallback::FallbackField>>,
     origins: BTreeMap<String, AcceptedOrigin>,
     distributions: BTreeMap<String, FieldDistribution>,
 }
@@ -65,7 +69,11 @@ impl Evaluation<'_> {
             .collect()
     }
 
-    fn make_extract_request(&self, id: &str) -> Option<ExtractRequest> {
+    fn make_extract_request(
+        &self,
+        id: &str,
+        output: Option<ExtractionSchema>,
+    ) -> Option<ExtractRequest> {
         let b = self.extract_binding(id);
         let projection = b
             .projection
@@ -122,8 +130,15 @@ impl Evaluation<'_> {
             template_id: b.template_id.clone(),
             instructions,
             projection,
-            output: b.schema.clone(),
-            schema_digest: b.schema_digest.clone(),
+            // Spec 070, 3.7.4: a partial request's schema is the subset the
+            // rules left absent, and its digest is over that subset.
+            schema_digest: match &output {
+                Some(o) => {
+                    rustev_contract::extraction_documents::extraction_schema_digest(o).ok()?
+                }
+                None => b.schema_digest.clone(),
+            },
+            output: output.unwrap_or_else(|| b.schema.clone()),
             vocabularies: self.extraction_vocabularies(id),
         })
     }
@@ -153,7 +168,51 @@ impl Evaluation<'_> {
             );
             return;
         }
-        let Some(request) = self.make_extract_request(id) else {
+        // Spec 070, 3.7.2 to 3.7.4: under `rules_first` the rules run before
+        // the request is listed; a request every required field of which
+        // they filled is skipped, and otherwise only the fields they left
+        // absent are requested.
+        let mut subset = None;
+        if let BoundExtractionFallback::Bound {
+            fill: Fill::RulesFirst,
+            required,
+            ..
+        } = &self.extract_binding(id).fallback
+        {
+            let required = required.clone();
+            let rules = self.evaluate_rules(id, &[]);
+            let filled = |name: &str| {
+                rules
+                    .iter()
+                    .any(|f| f.field.evidence.name == name && f.field.value.is_some())
+            };
+            let schema = &self.extract_binding(id).schema;
+            let all_required = match &required {
+                Some(names) => names.iter().all(|n| filled(n)),
+                None => schema.fields.iter().all(|f| filled(&f.name)),
+            };
+            let rest = ExtractionSchema {
+                fields: schema
+                    .fields
+                    .iter()
+                    .filter(|f| !filled(&f.name))
+                    .cloned()
+                    .collect(),
+            };
+            self.extraction.rules_first.insert(id.into(), rules);
+            if all_required {
+                self.complete_extract(
+                    id,
+                    None,
+                    ExtractionRequestOutcome::Skipped {
+                        reason: SkipReason::RulesFilled,
+                    },
+                );
+                return;
+            }
+            subset = Some(rest);
+        }
+        let Some(request) = self.make_extract_request(id, subset) else {
             self.complete_extract(
                 id,
                 None,
@@ -303,9 +362,12 @@ impl Evaluation<'_> {
                 ..
             }
         );
+        // The requested schema: a `rules_first` request's subset (spec 070,
+        // 3.7.5), so a member for an unrequested field is record-level.
+        let request = &self.extraction.requests[id];
         extraction_validate::validate(
-            &b.schema,
-            &self.extraction.requests[id].vocabularies,
+            &request.output,
+            &request.vocabularies,
             raw,
             b.distributions.clone(),
             option_logprobs,
@@ -354,20 +416,34 @@ impl Evaluation<'_> {
     ) {
         let b = self.extract_binding(id).clone();
         let produced = fields.is_some();
+        // Spec 070, 3.7.3 and 3.7.5: under `rules_first`, the rules' fields
+        // stand and the request's outcome covers only what it requested;
+        // the rules are not evaluated again.
+        let rules_first = self.extraction.rules_first.remove(id);
+        let requested: Vec<&ExtractionField> = match &rules_first {
+            Some(rules) => b
+                .schema
+                .fields
+                .iter()
+                .filter(|f| {
+                    !rules
+                        .iter()
+                        .any(|r| r.field.evidence.name == f.name && r.field.value.is_some())
+                })
+                .collect(),
+            None => b.schema.fields.iter().collect(),
+        };
         let mut fields = fields.unwrap_or_else(|| {
             let reason = match &outcome {
                 ExtractionRequestOutcome::Failed { reason } => {
                     AbsenceReason::RequestFailed { reason: *reason }
                 }
                 ExtractionRequestOutcome::Withheld { reason } => *reason,
-                // Neither is completed without fields: a skipped request
-                // (spec 070, 3.7.3) is never listed by this build.
-                ExtractionRequestOutcome::Succeeded | ExtractionRequestOutcome::Skipped { .. } => {
-                    unreachable!()
-                }
+                // A skipped request requests nothing (spec 070, 3.7.3).
+                ExtractionRequestOutcome::Skipped { .. } => AbsenceReason::FallbackNoMatch,
+                ExtractionRequestOutcome::Succeeded => unreachable!(),
             };
-            b.schema
-                .fields
+            requested
                 .iter()
                 .map(|f| ValidatedField {
                     value: None,
@@ -386,76 +462,50 @@ impl Evaluation<'_> {
         let mut fallback_reads = BTreeMap::new();
         let fallback = match &b.fallback {
             BoundExtractionFallback::None => FallbackIdentity::None,
-            BoundExtractionFallback::Bound {
-                identity,
-                program,
-                fill,
-                ..
-            } => {
-                let decl = self
-                    .compiled
-                    .plan
-                    .definition
-                    .steps
-                    .iter()
-                    .find(|s| s.id == id)
-                    .expect("extract declaration");
-                let rustev_contract::definition::StepBody::Extract(e) = &decl.body else {
-                    unreachable!()
-                };
-                let bound = crate::extraction_fallback::bind_in(
-                    program,
-                    e,
-                    &self.compiled.plan.definition.inputs,
-                )
-                .expect("compiled fallback");
-                let owned: BTreeMap<_, _> = program
-                    .sources
-                    .iter()
-                    .filter_map(|s| {
-                        if withheld.iter().any(|r| {
-                            crate::expr::base_ref_v2(r) == crate::expr::base_ref_v2(&s.reference)
-                        }) {
-                            return None;
-                        }
-                        // Spec 070, 3.4: a non-text scalar is read only by an
-                        // exact-value condition; an enum is its option text.
-                        use rustev_contract::extraction_documents::Scalar;
-                        let value = match self.value_and_meta(&s.reference).ok()?.0 {
-                            Value::Text(t) => (Scalar::Text(t), true),
-                            Value::Enum(t) => (Scalar::Text(t), false),
-                            Value::Integer(n) => (Scalar::Integer(n), false),
-                            Value::Bool(b) => (Scalar::Bool(b), false),
-                            _ => return None,
-                        };
-                        Some((s.reference.clone(), value))
-                    })
-                    .collect();
-                let sources = owned
-                    .iter()
-                    .map(|(r, (value, text))| {
-                        use crate::extraction_fallback::Source;
-                        use rustev_contract::extraction_documents::Scalar;
-                        let derivation = self
-                            .derivation
-                            .get(&crate::expr::base_ref_v2(r))
-                            .copied()
-                            .unwrap_or(Derivation::ExactDerived);
-                        let source = match value {
-                            Scalar::Text(t) if *text => Source::Readable {
-                                bytes: t.as_bytes(),
-                                derivation,
-                            },
-                            value => Source::Exact { value, derivation },
-                        };
-                        (r.clone(), source)
-                    })
-                    .collect();
-                let results = bound.evaluate(
-                    &sources,
-                    &self.extraction_vocabularies(id),
-                    self.compiled.plan.definition.limits.max_projection_bytes,
-                );
+            BoundExtractionFallback::Bound { identity, .. } if rules_first.is_some() => {
+                let rules = rules_first.expect("rules-first fields");
+                let mut model = std::mem::take(&mut fields).into_iter();
+                for declared in &b.schema.fields {
+                    let rule = rules
+                        .iter()
+                        .find(|r| r.field.evidence.name == declared.name)
+                        .expect("a rules field per declared field");
+                    // A runtime exact-step withholding of a source a rules
+                    // value read leaves it unavailable (038 3.11.4).
+                    let withheld_read = rule.sources_read.iter().any(|r| {
+                        withheld
+                            .iter()
+                            .any(|w| crate::expr::base_ref_v2(w) == crate::expr::base_ref_v2(r))
+                    });
+                    if rule.field.value.is_some() && !withheld_read {
+                        fallback_reads.insert(declared.name.clone(), rule.sources_read.clone());
+                        fields.push(rule.field.clone());
+                    } else if rule.field.value.is_some() {
+                        fields.push(ValidatedField {
+                            value: None,
+                            evidence: ExtractionFieldEvidence::new(
+                                declared.name.clone(),
+                                &declared.ty,
+                                ExtractionOrigin::Absent {
+                                    reason: AbsenceReason::SourceUnavailable,
+                                },
+                                None,
+                                None,
+                                None,
+                                vec![],
+                            ),
+                        });
+                    } else if matches!(outcome, ExtractionRequestOutcome::Skipped { .. }) {
+                        // Not requested: the rules' absence reason stands.
+                        fields.push(rule.field.clone());
+                    } else {
+                        fields.push(model.next().expect("a model field per requested field"));
+                    }
+                }
+                FallbackIdentity::Identity(identity.clone())
+            }
+            BoundExtractionFallback::Bound { identity, fill, .. } => {
+                let results = self.evaluate_rules(id, withheld);
                 fallback_reads = crate::extraction_fallback::merge(
                     &mut fields,
                     &results,
@@ -584,6 +634,81 @@ impl Evaluation<'_> {
             whole,
             node: ValueGrade::Ungraded,
         }
+    }
+
+    /// Evaluate the step's rules program over its sources, less those
+    /// withheld from exact steps (038 3.7.5, 3.11.4).
+    fn evaluate_rules(
+        &self,
+        id: &str,
+        withheld: &[String],
+    ) -> Vec<crate::extraction_fallback::FallbackField> {
+        let BoundExtractionFallback::Bound { program, .. } = &self.extract_binding(id).fallback
+        else {
+            return vec![];
+        };
+        let decl = self
+            .compiled
+            .plan
+            .definition
+            .steps
+            .iter()
+            .find(|s| s.id == id)
+            .expect("extract declaration");
+        let rustev_contract::definition::StepBody::Extract(e) = &decl.body else {
+            unreachable!()
+        };
+        let bound =
+            crate::extraction_fallback::bind_in(program, e, &self.compiled.plan.definition.inputs)
+                .expect("compiled fallback");
+        let owned: BTreeMap<_, _> = program
+            .sources
+            .iter()
+            .filter_map(|s| {
+                if withheld
+                    .iter()
+                    .any(|r| crate::expr::base_ref_v2(r) == crate::expr::base_ref_v2(&s.reference))
+                {
+                    return None;
+                }
+                // Spec 070, 3.4: a non-text scalar is read only by an
+                // exact-value condition; an enum is its option text.
+                use rustev_contract::extraction_documents::Scalar;
+                let value = match self.value_and_meta(&s.reference).ok()?.0 {
+                    Value::Text(t) => (Scalar::Text(t), true),
+                    Value::Enum(t) => (Scalar::Text(t), false),
+                    Value::Integer(n) => (Scalar::Integer(n), false),
+                    Value::Bool(b) => (Scalar::Bool(b), false),
+                    _ => return None,
+                };
+                Some((s.reference.clone(), value))
+            })
+            .collect();
+        let sources = owned
+            .iter()
+            .map(|(r, (value, text))| {
+                use crate::extraction_fallback::Source;
+                use rustev_contract::extraction_documents::Scalar;
+                let derivation = self
+                    .derivation
+                    .get(&crate::expr::base_ref_v2(r))
+                    .copied()
+                    .unwrap_or(Derivation::ExactDerived);
+                let source = match value {
+                    Scalar::Text(t) if *text => Source::Readable {
+                        bytes: t.as_bytes(),
+                        derivation,
+                    },
+                    value => Source::Exact { value, derivation },
+                };
+                (r.clone(), source)
+            })
+            .collect();
+        bound.evaluate(
+            &sources,
+            &self.extraction_vocabularies(id),
+            self.compiled.plan.definition.limits.max_projection_bytes,
+        )
     }
 
     pub(super) fn eval_accept(&mut self, id: &str, a: &AcceptModelDerived) {

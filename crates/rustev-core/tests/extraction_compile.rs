@@ -1431,8 +1431,7 @@ fn ranking_exact_order_sources_refuse_unaccepted_extract_fields() {
 }
 
 /// Spec 070, 3.7.1 and 3.5.6: `required` only with `rules_first`, 1 to 32
-/// distinct declared top-level fields; `rules_first` itself is refused by
-/// this build until spec 070's increment 3.
+/// distinct declared top-level fields.
 #[test]
 fn required_and_rules_first_are_checked_before_binding() {
     let mut d = fixture();
@@ -1457,10 +1456,6 @@ fn required_and_rules_first_are_checked_before_binding() {
         (
             json!({"rules_program":"filters-fallback@1","fill":"rules_first","required":["party_size","party_size"]}),
             "required must name 1 to 32",
-        ),
-        (
-            json!({"rules_program":"filters-fallback@1","fill":"rules_first","required":["party_size"]}),
-            "rules_first is not supported by this build",
         ),
     ] {
         extract(&mut d).fallback = rules(fallback);

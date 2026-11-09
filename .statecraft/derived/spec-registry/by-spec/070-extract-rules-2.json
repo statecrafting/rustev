@@ -5,6 +5,7 @@
       "032-evidence-quality"
     ],
     "created": "2026-11-08",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -91,7 +92,7 @@
       }
     ],
     "id": "070-extract-rules-2",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-10-compatibility-and-identity",
@@ -146,7 +147,7 @@
       }
     ],
     "sectionDigests": {
-      "070-extraction-rules-2-token-extractors-exact-value-conditions-declared-date-formats-and-rules-first-amends-038-and-032": "47c64d5cb178892216b9138248e91c06a908c11156f9a77498e626aa1d4b885f",
+      "070-extraction-rules-2-token-extractors-exact-value-conditions-declared-date-formats-and-rules-first-amends-038-and-032": "49d8b24e2e9aa9783c908ccf428def34b1f1809d1ff7c1c70069c31189c0835c",
       "1-purpose": "c27d666654080228bb42b54d7d4a519a115808f44be88e726e22c9e4795c196f",
       "2-1-binding-principles": "730a089e011a10d9dffd324d744d8ff81340332a35875f5921ca1cf81a2695c5",
       "2-territory": "8422c5c45faf6648154ee1468694a7467df2278072119da3ab2466c546a78805",
@@ -167,9 +168,9 @@
       "5-observable-negative-cases": "7866b1ccf648893e1ac03a3892f9fbcc789f5b05ff7ff7a81d543fb65984886b",
       "acceptance": "94bf9b999610f485446de1ae50844e60f138f0248e13c72aaf4b71b8d6760273",
       "decisions-at-approval": "f6a8896774c4e3e286179bdf7b26ae7e36e4b9cc99f3f7afaae89c431e4b783e",
-      "implementation-record": "5edbbe44d88163971d77c1e0df09026cbbda905f9ece0faf72284c1e60a8ea7b",
+      "implementation-record": "8229fa53e27ad6ee5df6dc92ec9eb8b474a91633ac8a26bcbdee663efae3155e",
       "increments": "9b48d54b050e75c77f393eecd04201225a4b197d8a06bba9ef0bb436176c75a8",
-      "verification": "f09d2ecfe0427f0790e7e18b53ef96c9fa64f2204dc26649b98e8ea7e9ab792b"
+      "verification": "835b8330622fc318386b22385e3ff63c657294119d27c8798daf2ef2fd4d26e5"
     },
     "sectionHeadings": [
       "070: Extraction rules 2: token extractors, exact-value conditions, declared date formats and rules first (amends 038 and 032)",
@@ -202,6 +203,6 @@
     "summary": "An amendment of approved specs 038 (3.3.3, 3.3.5, 3.5, 3.7, 3.11, 3.12, 3.14) and 032 (3.2.1, 3.9.3), for #572, ratified by the owner on 2026-11-08 (A-90) for release 0.7.0. A host that runs per-sender templates over forwarded booking emails cannot express them in `rustev.extract-rules/1`, so it runs them as a host backend and every templated field becomes `model-derived`. This spec adds the program schema `rustev.extract-rules/2`, a superset of /1: the value extractors `token_after` (a token from a declared ASCII charset after a term), `token_matching` (a token of a small structured shape, never a regular expression), `date` (a closed set of declared formats with month names from a table the program declares) and `vocabulary_after` (a token that is a member of a declared vocabulary, graded `hint` under spec 032); the conditions `equals` and `one_of` over an exact input value; and the extract step's `fill: rules_first`, which evaluates the program before the request is listed, skips the request when every required field is filled, and otherwise asks the backend only for the fields the rules left absent. Everything stays pure, bounded and evaluated in `rustev-core` with no new dependency. A rules match is evidence that this program produced this value from this text, never that the value is true. /1 programs, every existing plan and every `PlanId` keep their bytes.\n",
     "title": "Extraction rules 2: token extractors, exact-value conditions, declared date formats and rules first (amends 038 and 032)"
   },
-  "shardHash": "b1c40c4e6f374fa16d8f5abc214823571bec23ab39277c76d9afc174362f2a77",
+  "shardHash": "8c17fbe21537d2851ec1c48e7fe0f0bd279ee908c10b26aeeaeebdc30c189468",
   "specVersion": "1.11.0"
 }
