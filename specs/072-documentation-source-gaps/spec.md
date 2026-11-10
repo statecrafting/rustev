@@ -212,3 +212,9 @@ Not started. Planned increments:
 3. `schemars` for `rustev-eval` (dependency-only pull request), then the
    schemas (3.3).
 4. The page, its example and acceptance (3.4).
+
+**Increment 3, step 1 (2026-11-10, test only).** `rustev-eval`'s
+`tests/dependencies.rs` pins its normal dependencies exactly. So that the
+dependency-only change adding `schemars` passes on its own, the test accepts
+either exact list, with or without `schemars`, until the schema change
+tightens it to the list with `schemars`. No claim of spec 004 changes.
