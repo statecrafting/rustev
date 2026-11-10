@@ -88,11 +88,11 @@ This runs a lodging recommendation from the reference package, with the
 files come from the release tag of the version you installed.
 
 ```sh
-V=$(rustev --version | cut -d' ' -f2)   # for example 0.7.0
-REF=https://raw.githubusercontent.com/statecrafting/rustev/v$V
-curl -fsSLO $REF/packages/rustev-pkg-lodging/data/lodging-recommendation.definition.json
-curl -fsSLO $REF/backends/rustev-backend-rules/tests/fixtures/lodging.rules.json
-curl -fsSLO $REF/packages/rustev-pkg-lodging/data/snapshots/lg-c01.json
+V="$(rustev --version | cut -d' ' -f2)"   # for example 0.7.0
+REF="https://raw.githubusercontent.com/statecrafting/rustev/v$V"
+curl -fsSLO "$REF/packages/rustev-pkg-lodging/data/lodging-recommendation.definition.json"
+curl -fsSLO "$REF/backends/rustev-backend-rules/tests/fixtures/lodging.rules.json"
+curl -fsSLO "$REF/packages/rustev-pkg-lodging/data/snapshots/lg-c01.json"
 
 # Compile the definition, with its rules, into an identified plan.
 rustev plan compile --definition lodging-recommendation.definition.json \
@@ -283,9 +283,9 @@ To verify a CLI binary you downloaded:
 
 ```sh
 V=0.7.0 T=linux-x64-gnu   # the version and platform you downloaded
-gh release download v$V -R statecrafting/rustev -p "rustev-$V-$T.tar.gz*"
-sha256sum -c rustev-$V-$T.tar.gz.sha256            # shasum -a 256 -c on macOS
-gh attestation verify rustev-$V-$T.tar.gz --repo statecrafting/rustev
+gh release download "v$V" -R statecrafting/rustev -p "rustev-$V-$T.tar.gz*"
+sha256sum -c "rustev-$V-$T.tar.gz.sha256"            # shasum -a 256 -c on macOS
+gh attestation verify "rustev-$V-$T.tar.gz" --repo statecrafting/rustev
 ```
 
 The last command checks the SLSA provenance: the archive was built by this
