@@ -11,7 +11,7 @@ use crate::scoring::ScorerKind;
 use crate::selection::{ClauseOutcome, ClauseResult};
 
 /// Optional, inclusive per-run bounds, on both sides of a selection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Integrity {
     #[serde(
@@ -19,12 +19,15 @@ pub struct Integrity {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "present"
     )]
+    // Absent or an integer; the parser refuses `null`.
+    #[schemars(with = "u64")]
     pub max_invalid: Option<u64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         deserialize_with = "present"
     )]
+    #[schemars(with = "u64")]
     pub max_upstream_failures: Option<u64>,
 }
 

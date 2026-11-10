@@ -188,7 +188,7 @@ impl ConfigAdapter {
 /// What determines a task adapter's label check and correctness (spec
 /// 014, 3.1): the content digest of a canonical document that fully
 /// determines them, or `opaque` when no document does.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AdapterRules {
     Bound(ContentDigest),
@@ -210,7 +210,7 @@ pub struct MetricFormula {
     pub formula: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Direction {
     /// Lower is better: the candidate may exceed the baseline by at most the
