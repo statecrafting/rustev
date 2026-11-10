@@ -29,9 +29,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@27"
       },
-      "digest": "be5b5186fb1744b9152aca223175de667fa0105132b8d80ad3ba438c44d57de8",
-      "bytes": 5901,
-      "written_at": "2026-11-07T23:01:44Z"
+      "digest": "8902e7a75832d93825f0f98e284931a1444288ac36b51ba6bdff580f353426cd",
+      "bytes": 5916,
+      "written_at": "2026-11-10T18:29:22Z"
     },
     {
       "path": ".github/workflows/statecraft-ci.yml",
@@ -73,9 +73,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@27"
       },
-      "digest": "b4b686aa07162ca927c2e45963fd9ddd796169a7f2da045b4cc18086fc4f8687",
-      "bytes": 24244,
-      "written_at": "2026-11-07T23:01:44Z"
+      "digest": "1229483256bc2e8081215f47d9e642420af3a419d0b100e69bb0083839fe1518",
+      "bytes": 24268,
+      "written_at": "2026-11-10T18:29:22Z"
     },
     {
       "path": ".statecraft/setup/github-actions-rust.remote.json",
@@ -270,6 +270,7 @@
           "integrations/rustev-node/types",
           "integrations/rustev-wasm/types",
           "backends/rustev-backend-embed-linear/qualification",
+          "docs/reference",
           "tools/rustev-conformance/cases"
         ]
       },
