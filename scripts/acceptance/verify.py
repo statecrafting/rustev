@@ -55,7 +55,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # cancelled while compiling; the selection specs 029, 061, 064 and 065
 # move to their own group.
 GROUPS = {
-    "evaluation": "004".split(),
+    "evaluation": "004 071".split(),
     "cli-backends": "006 014 041".split(),
     "cli-repeat": "001 005 011".split(),
     "selection": "029 061 064 065".split(),

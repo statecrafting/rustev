@@ -31,13 +31,13 @@
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"
     },
     "AGENTS.md": {
-      "contentHash": "1f5453c3e5bb2c3eda5b0deab517d1e7cb6c055c61e8ca0e984664a5edf69607"
+      "contentHash": "271f4ca3f832868136d4e53233b9b5000d7e8dadd070700607fcd1dd01d23ab7"
     },
     "Cargo.toml": {
       "contentHash": "68b9d356ffb92294787d8ab634c4d95b057162539c1a31216a774d90caf77e4c"
     },
     "Makefile": {
-      "contentHash": "b0da5ea291c3118b0c1859cf147ce5e89d0b08a4f55cc0077ecee9e6cb325cde"
+      "contentHash": "ff052a728c19a1680654a2d6e7912cf0aef3aac831943f904264618a03103903"
     },
     "README.md": {
       "contentHash": "a7db75e7b6703725ffe56c47b26272ff6b2571ff1b33d5106c2f8a1780d76c5c"
@@ -70,7 +70,7 @@
       "contentHash": "896ccc486bd9f594e4b323e11fd1da0fd62b96f6da5018c26c75560bfa3ac9fc"
     },
     "docs/decisions/00-founding-decisions.md": {
-      "contentHash": "deefbbdd267b2d810ba4028901e0a7886130f3cf03c04d313186c59e1f15b4fc"
+      "contentHash": "c90bef859fc23752ee732b8e4bfee9529581c2219e045b42f266156486dde66c"
     },
     "docs/design/001-decision-engine-architecture.md": {
       "contentHash": "97b0ab9aefbfcce74dc39e9c00fc786d18916d48f84ac7ef4cb26acc543d2a1f"
@@ -107,6 +107,225 @@
     },
     "docs/design/discussions/README.md": {
       "contentHash": "c7df0ab376e0e837439039e52f433c68b312bea5ed89bfdd1e39a421b6ec2969"
+    },
+    "docs/reference/000-bootstrap.md": {
+      "contentHash": "d2520e196fa2f90f45829ebe79f53c64ce5932fd3107d905f5204f721e23e157"
+    },
+    "docs/reference/001-boundaries-and-authority.md": {
+      "contentHash": "fb126a538ca19bb567203dd3e2e37521639b05e4cf9b192c2b24163d7c3d6719"
+    },
+    "docs/reference/002-decision-contract-and-pure-core.md": {
+      "contentHash": "ff4f445cf6c37329df06f2d7c353e07a4bf3ba9dcc5fdd8b9aa302c60e89a2ba"
+    },
+    "docs/reference/003-runtime-execution-and-evidence.md": {
+      "contentHash": "d657250da0c577cde26c2ad81aa852238fb67aa5efd8e7ea252d5bda95bb7270"
+    },
+    "docs/reference/004-evaluation-and-replay.md": {
+      "contentHash": "b24bc5431700852ad35f306dec26d7516bd9d621f1de31db0ae2c087e6c13314"
+    },
+    "docs/reference/005-reference-backends.md": {
+      "contentHash": "8852162de3561d96e27ac2143f081467256db0a188e75d213abd4dba17905ed8"
+    },
+    "docs/reference/006-cli-surface.md": {
+      "contentHash": "a97ab440d5ef85118b4b9a56394ca7b47fffe30f370506eb5b65467520b987de"
+    },
+    "docs/reference/007-support-routing-package.md": {
+      "contentHash": "b2de828b1224bf9dea2d3d24e3b84c08c8c3b9def1136f1a94ba6e7529824ca6"
+    },
+    "docs/reference/008-reference-package-lodging.md": {
+      "contentHash": "a6bbe6e92b0891a8f2455d209a55b6ebb22c65552679499bfcc7a99c6e7ed6fd"
+    },
+    "docs/reference/009-remote-adapter-protocol.md": {
+      "contentHash": "07a14c5acffd963c7350632885f3c1d5469f4007bf0fe6d92ed539465b65df4f"
+    },
+    "docs/reference/010-integrations.md": {
+      "contentHash": "808d15650511631f576c84494c7780c1f1987eff3cca5ce985a3f71342fbd4b6"
+    },
+    "docs/reference/011-semantic-backend.md": {
+      "contentHash": "2a4f2afd1bf0debe7ffa231e1dcf9b9fa467adc337644c30016fb6af34192437"
+    },
+    "docs/reference/012-jev-integration.md": {
+      "contentHash": "4f230979785e704b9e50a04b323af1a4c60f06366905c7e200279c15477c67b0"
+    },
+    "docs/reference/013-remote-state-on-failed-attempts.md": {
+      "contentHash": "91f4b0bdeee565e15b47199849a3d19a37e5c851bb14fb05b73d303e32e930a1"
+    },
+    "docs/reference/014-report-integrity.md": {
+      "contentHash": "d1c2cc0ea7b6841e81a91ebd7fc43b418fc26b5a073d0018604a4460a7f635b0"
+    },
+    "docs/reference/015-per-case-bundle-failures.md": {
+      "contentHash": "cc24bf7cd0f769d2b8a9eeb1731b17d8167990eceeb880b50bd226886875ee2e"
+    },
+    "docs/reference/016-support-routing-swap-threshold.md": {
+      "contentHash": "8bf7c11464fdf039334895df015c0b14ab0f8ff2acbb4b7e3a2b034965ca3821"
+    },
+    "docs/reference/017-general-runtime-optimization.md": {
+      "contentHash": "6853a20c0543dc8221c13bbc6ff3530c91ff1964466280e9cccceaf233549a36"
+    },
+    "docs/reference/018-statecraft-profile-14.md": {
+      "contentHash": "00bd14706b919ab7a2743597e2ae20de8bf9eab5790f74ab83b82e38a232ff30"
+    },
+    "docs/reference/019-dynamic-questions.md": {
+      "contentHash": "56463bcb0bca86d9d0661658ed22495350e3a8b2acb8a4aaa987e2679f8c74ae"
+    },
+    "docs/reference/020-remote-protocol-refinements.md": {
+      "contentHash": "1e1a76dd21fe0745f8838fe651f6d4a63cc35319a64dae9c28f5f6630c567064"
+    },
+    "docs/reference/021-packaging-and-first-release.md": {
+      "contentHash": "20e34c7f17cbb0628bbf94f7fbbb3937f4d95f0997deec02ff3c1dc803c5dc19"
+    },
+    "docs/reference/022-jev-production-transport.md": {
+      "contentHash": "a88978333b7de1c34688af30f73601a7a3fe6543a43a27093e33194b75a45748"
+    },
+    "docs/reference/023-real-data-quality-qualification.md": {
+      "contentHash": "8eb0d77ad319780d1b9854312822dc763ae6e0d156345036bee724be0ddada55"
+    },
+    "docs/reference/024-second-local-semantic-backend.md": {
+      "contentHash": "bcacd8e82c1b8af33e744d6f12ac7cc309d4206638a6b5e5e0c675a68972c26e"
+    },
+    "docs/reference/025-wire-witness-replay-input.md": {
+      "contentHash": "6a686c9b0554d82bd52359d0c4f8d8c41d5ac46f797e3f1b897b9ed37438b0b9"
+    },
+    "docs/reference/026-live-re-execution.md": {
+      "contentHash": "d0857fe1d7bb85b06c00057e199a4ed08cc730673f68fe1636a9880f8b356cf5"
+    },
+    "docs/reference/027-node-and-wasm-bindings.md": {
+      "contentHash": "082919af63557b673c5b6cf4a32d92dc191f01213f247d3570fc701b84595cac"
+    },
+    "docs/reference/028-opentelemetry-evidence-sink.md": {
+      "contentHash": "7e0ccf8b9ef4e8b0be576a94351e81c6577e011d3466902fcee74af8aa65deae"
+    },
+    "docs/reference/029-evaluation-repeatability.md": {
+      "contentHash": "fbb0b57a5085528e8a901124781b619cf59d028d37391cadf1a382ac34d0500a"
+    },
+    "docs/reference/030-bedrock-backend.md": {
+      "contentHash": "02033f6678b9fe7fe7f63d872828741c65eae452e85abf04f3a538343b256819"
+    },
+    "docs/reference/031-public-api-and-release-family.md": {
+      "contentHash": "d4d7c36bfff2f4722011a11003815a84da023c33937e02ae9b17266ef67e6535"
+    },
+    "docs/reference/032-evidence-quality.md": {
+      "contentHash": "9fa1126ae5ba5d2a2ad6b96b2b858fc80fdaad5633692ae2e18e03dca71b6b45"
+    },
+    "docs/reference/033-provenance-rules-and-actionable-outcomes.md": {
+      "contentHash": "4a187aa861a568ed0b33fb41be7f5003521523d09b537c84c1a6409709b76938"
+    },
+    "docs/reference/034-parameterized-definitions.md": {
+      "contentHash": "9a139adcf528c2728e9683afca2226d4e7d05f6678254671da088993f0f6fc34"
+    },
+    "docs/reference/035-screening-seam.md": {
+      "contentHash": "117aabca5eec2a0befaf6c8d123a106d520b9a3419e84136e147caa20b30a78a"
+    },
+    "docs/reference/036-mid-plan-acquisition.md": {
+      "contentHash": "ba9f02354836a2cff229ad7d97c72d346306ecc40c955368cd43494c6d2e7126"
+    },
+    "docs/reference/037-generation-steps.md": {
+      "contentHash": "d2a9ee65ff0afbeba6b99333b4c6f9a4b5b5f826b225d87c743be3fa1d0f9500"
+    },
+    "docs/reference/038-structured-extraction.md": {
+      "contentHash": "e097a49f9259e63f8b76e7695b194e2dc26bee1b94a47c24257d46ce331fd52c"
+    },
+    "docs/reference/039-model-backed-rank.md": {
+      "contentHash": "d7f8e87dc3f4b31d4c8da870bada92de6d655caada833eabe36b773992fba519"
+    },
+    "docs/reference/040-decision-explanation.md": {
+      "contentHash": "58fb55fddaa56b4667a2c2cda1662656f8228879544842500fa5fee36b03e067"
+    },
+    "docs/reference/041-ranking-and-rubric-metrics.md": {
+      "contentHash": "5ae01707227d19fa6e624685fb18b23bc66c3ad7a0d298adf96793def900d86d"
+    },
+    "docs/reference/042-decision-service-and-remote-seams.md": {
+      "contentHash": "0cd780255054e09950ba8146b80953fb66a85066575edc5a92f72421dbc093b8"
+    },
+    "docs/reference/043-live-re-execution-at-scale.md": {
+      "contentHash": "5c04e93d3b971e7852afaae47f13b94362fc4fd4f2b3f7e35da9ed46ad47373b"
+    },
+    "docs/reference/044-runtime-optimization-increment-2.md": {
+      "contentHash": "a98d72f82818ce996d5921722521d73f28541ab0e15a7ba8733303af8b8945e2"
+    },
+    "docs/reference/045-command-surface-release-layer.md": {
+      "contentHash": "81519754d7697d03e291f090391b542ab67b30f3ab05b690b4a49bb39d7aeeab"
+    },
+    "docs/reference/046-wasm-size-budget.md": {
+      "contentHash": "e76ded63b0adc7e144d37e34ab5e7eccccb40ec5494b35f2bbe04ea888ae182c"
+    },
+    "docs/reference/047-target-independent-transcendentals.md": {
+      "contentHash": "a4f525bb5d8922a22d473a0fa9be622c0a7d1c7954ce37f68556ab1aec9bba58"
+    },
+    "docs/reference/048-statecraft-profile-17-and-spec-spine-0-31.md": {
+      "contentHash": "e9e5effa54ad236ee2688c1441e91c1be3e0296b495d2fafcc5f55c92f8ad51c"
+    },
+    "docs/reference/049-opentelemetry-through-the-node-binding.md": {
+      "contentHash": "742e68f17dbc6b465f79970925ad28377e8e3f16387363c5e3894f6d9c5c6050"
+    },
+    "docs/reference/050-wasm-without-parameterized-definitions.md": {
+      "contentHash": "8f61bfae8b60858367f2aa7ba4b3398ba0e994424edbd605a6b46114801519cc"
+    },
+    "docs/reference/051-wasm-gzip-and-raw-budget.md": {
+      "contentHash": "2ca1a5b2aa0b6de6272424d7a902efd764f0d1b1f5d030b2e63a316c4a4f800a"
+    },
+    "docs/reference/052-wasm-budget-for-specs-035-to-037.md": {
+      "contentHash": "43645d79038cf1d4805e790b397ed135e5649f8c39d8b7446ec151300a674ede"
+    },
+    "docs/reference/053-signed-release-candidates.md": {
+      "contentHash": "d7286645e58a206ac6d658c9cf423bfa1d851739e600a6bf6bfea3760e06f1aa"
+    },
+    "docs/reference/054-npm-rustev-scope.md": {
+      "contentHash": "784244bfb2d93d30f407bbee0bd0c161e7b573c1dbf6f6514c9d4c23b380bd18"
+    },
+    "docs/reference/055-wasm-gzip-measured.md": {
+      "contentHash": "88ee5b656dea88785f94ea19c5eb26328c71ea02f7b3ad35277a1a73126e03a0"
+    },
+    "docs/reference/056-release-0-1-1-and-consumer-qualification.md": {
+      "contentHash": "9c9883523cd58653047779089879a4a855b9737d597ab72de4f955cfee8df9b0"
+    },
+    "docs/reference/057-wasm-raw-budget-for-spec-039.md": {
+      "contentHash": "db1c02102ced388e4470b9bbb6817b1e3a308a7713494507a342cb029a5dbcf0"
+    },
+    "docs/reference/058-one-tagged-run-releases-the-family.md": {
+      "contentHash": "5ccf9d0c612c9ab16efe08bfda597bca8825d09847d4001311f036ce41bec4f6"
+    },
+    "docs/reference/059-shared-remote-transport-by-dependency.md": {
+      "contentHash": "48e3193416c829a1c82da5b9943d9f13765387bafffc338ba3a0173f3db9b7e6"
+    },
+    "docs/reference/060-the-service-image-in-the-release.md": {
+      "contentHash": "7d9088c1e61ea94bfda333075b0ce4470fbe46e0f2804f3d2057e52bc7127239"
+    },
+    "docs/reference/061-host-scored-repeat-sets.md": {
+      "contentHash": "83054ea5e4bd6d7f868da668040d3b320ceeb4a252c80d5a036c06ee6513a6a9"
+    },
+    "docs/reference/063-node-binding-parity.md": {
+      "contentHash": "78e06aeadcc15ea965c297fe41c95a6054e50086255252d5d5caf560ed8aa824"
+    },
+    "docs/reference/064-selection-gate-case-regressions.md": {
+      "contentHash": "1233c2f950ac838db30096d8c21098e8e23561350380aef6b404a79b848c9fc3"
+    },
+    "docs/reference/065-selection-gate-run-integrity.md": {
+      "contentHash": "81ee0cc22a79a5c85f39f224d7f1b5402522b70cd133cb806eedc163fa46ca89"
+    },
+    "docs/reference/066-segment-ancestry-predicate.md": {
+      "contentHash": "c53e5b0aa9ea8a0cfbb52afc07045903edb4a9c871dc3a0e7fe148e308a27e94"
+    },
+    "docs/reference/067-node-live-repeat-runs.md": {
+      "contentHash": "9150b3f86b31f7af67099f7f32fc86b2dc658cc969d97abfd0a03998ea5907ba"
+    },
+    "docs/reference/068-qualification-requires-npm-provenance.md": {
+      "contentHash": "6352a12a1fc7a0459b9e75e8b014e838c39c62c0529a066a37f3054dd61aefa4"
+    },
+    "docs/reference/069-node-host-nonblocking-open.md": {
+      "contentHash": "31a9419a71d8baac6c57e074438ba2f70fbe575d72bc243bb1368a22826d6318"
+    },
+    "docs/reference/070-extract-rules-2.md": {
+      "contentHash": "a2a69295d0d0a169765354edd7f65b0cc1d0ec9d1608149889018d93fd92c8bd"
+    },
+    "docs/reference/071-generated-spec-reference.md": {
+      "contentHash": "c90c78da48f58b30657c340050a624a76be2812ab947a0de550aeb8703f52726"
+    },
+    "docs/reference/README.md": {
+      "contentHash": "6f9670fae557292abeba9ad2c5c1452676f53b5905f46d9c2605000d7e90ddd9"
+    },
+    "docs/reference/request.json": {
+      "contentHash": "3e1349fbcef3dfaceb1ebb6de5ed3550fbb1967a514fb9fc0d32cfefe56b7034"
     },
     "integrations/rustev-otel/LICENSE": {
       "contentHash": "bd593de664ba50d42098c9259bcf314ccb8ba38865c45aaa8e049d8711aa22b8"

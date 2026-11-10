@@ -2,7 +2,9 @@
 #
 #   make tools    install the pinned spec-spine into .bin
 #   make gate     read-only: judge the corpus (meaningful with no code at all)
-#   make refresh  writing: recompute the committed shard trees
+#   make refresh  writing: recompute the committed shard trees and the
+#                 spec reference pages (spec 071)
+#   make reference-check  read-only: compare the reference pages (spec 071)
 #   make code     build, test, clippy, fmt and the boundary check
 #   make boundaries  the dependency rules of spec 001 section 3.4
 #   make verify   every approved spec's declared acceptance (`spec-spine verify`)
@@ -16,10 +18,11 @@ SPEC_SPINE_LOCAL := .bin/spec-spine
 SPEC_SPINE ?= $(if $(wildcard $(SPEC_SPINE_LOCAL)),$(SPEC_SPINE_LOCAL),spec-spine)
 
 CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/Cargo.toml integrations/*/Cargo.toml)
+REFERENCE_REQUEST := docs/reference/request.json
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
-VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 017 019 020 021 022 023 026 027 028 029 030 031 033 034 035 036 037 038 039 040 041 042 043 044 045 049 059 060 061 063 064 065 066 067 068 069 070
+VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 017 019 020 021 022 023 026 027 028 029 030 031 033 034 035 036 037 038 039 040 041 042 043 044 045 049 059 060 061 063 064 065 066 067 068 069 070 071
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify verified-specs release-candidate adoption msrv semver changelog conformance conformance-harvest bindings landing-status
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify verified-specs release-candidate adoption msrv semver changelog conformance conformance-harvest bindings landing-status reference-check
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -33,10 +36,19 @@ gate:
 	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
 	$(SPEC_SPINE) index coverage --fail-on-untraced
+	$(SPEC_SPINE) reference check --request $(REFERENCE_REQUEST)
 
+## Spec 071 3.2: the pages read the fresh registry and index, and are
+## themselves a hashed input under docs/, so the index runs again after them.
 refresh:
 	$(SPEC_SPINE) compile
 	$(SPEC_SPINE) index
+	$(SPEC_SPINE) reference generate --request $(REFERENCE_REQUEST)
+	$(SPEC_SPINE) index
+
+## Read-only: the committed reference pages against a fresh generation.
+reference-check:
+	$(SPEC_SPINE) reference check --request $(REFERENCE_REQUEST)
 
 code: build test clippy fmt boundaries
 
