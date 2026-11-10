@@ -452,6 +452,12 @@ pub const EXAMPLE_RULES: &[u8] = include_bytes!("../data/synthetic-example.rules
 /// This demonstrates mechanics, not calibration quality.
 pub const EXAMPLE_CALIBRATION: &[u8] = include_bytes!("../data/synthetic-example.calibration.json");
 
+/// The SYNTHETIC example definition (spec 072 3.1): [`definition`] for the
+/// reference thresholds with `topic` bound to [`EXAMPLE_CALIBRATION`], so a
+/// host or the CLI can compile it with [`EXAMPLE_RULES`] and
+/// [`EXAMPLE_CALIBRATION`] alone. Mechanics only.
+pub const EXAMPLE_DEFINITION: &[u8] = include_bytes!("../data/synthetic-example.definition.json");
+
 /// The SYNTHETIC `sr-t01` snapshot, fresh at [`EVALUATION_TIME_MS`].
 pub const EXAMPLE_SNAPSHOT: &[u8] = include_bytes!("../data/synthetic-example.snapshot.json");
 

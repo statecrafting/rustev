@@ -32,6 +32,10 @@
       {
         "path": "scripts/acceptance/",
         "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -99,6 +103,19 @@
       {
         "locations": [
           {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "Makefile"
           }
         ],
@@ -127,5 +144,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "922ac80c4c5761bac920061d7d1fe687ab87dca49a64336e8608a0e08d0afb76"
+  "shardHash": "6881de0d9fbd3d89d3291433c9760ed31763f7bd9ca574001e41c5594b4f9f75"
 }

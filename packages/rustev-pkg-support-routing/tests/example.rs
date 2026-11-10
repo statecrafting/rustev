@@ -41,6 +41,16 @@ fn declared_example_reproduces_the_expected_judgment() {
     let params =
         pkg::Params::with_topic(pkg::TopicCalibration::Calibrated(calibration.id().unwrap()));
     let definition = pkg::definition(&params).unwrap();
+    // Spec 072 3.1: the same definition, committed so the CLI can compile it.
+    if bless {
+        std::fs::write(
+            common::data_dir().join("synthetic-example.definition.json"),
+            definition.canonical().unwrap(),
+        )
+        .unwrap();
+    } else {
+        assert_eq!(definition.canonical().unwrap(), pkg::EXAMPLE_DEFINITION);
+    }
     let compiled = compile(
         &definition,
         std::slice::from_ref(backend.descriptor()),
