@@ -199,6 +199,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Res, Usage> {
 fn execute(p: &Parsed, cx: &Context, s: &RunSettings) -> Res {
     let command = &p.name();
     let io_err = |e: IoFail| Done::io(command, e);
+    crate::outputs::check(p)?;
     io::ensure_absent(&s.record_out).map_err(io_err)?;
     if let Some(c) = &s.capture {
         io::ensure_absent(&c.bundle_out).map_err(io_err)?;

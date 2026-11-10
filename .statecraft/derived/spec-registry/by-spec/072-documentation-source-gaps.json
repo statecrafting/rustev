@@ -108,7 +108,7 @@
       }
     ],
     "sectionDigests": {
-      "072-source-gaps-found-by-the-selection-gate-feature-page-amends-006-007-027-and-029": "a36b69f45d775ba834fbd61c3da63b79d301bda697960d7048964450003d3149",
+      "072-source-gaps-found-by-the-selection-gate-feature-page-amends-006-007-027-and-029": "3465d1d4f5b298323c334eb8949fadac40ef2ca94edc5c44ad4c2a72d14ba1d8",
       "1-purpose": "01ec282f05bf1a99f2a4019d0ded773d53fde539e9cf3e08be38a59aa62bbe85",
       "2-territory": "6ceff4f374ceaa270b228c2ba4037372d5d1e3f9e7e28fcdf41166c6de4b142e",
       "3-1-a-cli-ready-synthetic-definition": "0211331883961c80be44017d807adebcbd3f055e9e63c4e7899ca2ec449f9502",
@@ -119,7 +119,7 @@
       "4-out-of-scope": "1661f1b64c6d04292ebe07382a12224f57d617828f9c9df187241adaf9f040d8",
       "5-observable-negative-cases": "62432a1a7b52bdc3ccd5d52a02d1ba97c68780a82d5b78046d6965684a701c36",
       "acceptance": "a6c204457bea1bcbcbd6fe1ed3648c06823de7404353c6ee191934fc729178ba",
-      "implementation-record": "147f81a35a0dca244816e80219685d3bb811281c53657e67699ae1a48c36ed58",
+      "implementation-record": "9be1f609525bbfa63ecbaa584574c709ec0a3bb1a870f906690174b8c649fea9",
       "verification": "563336deb87106bb44ed525934ca68f08c0adb6bd3a778c47d7f11946f85c4d0"
     },
     "sectionHeadings": [
@@ -142,6 +142,6 @@
     "summary": "The selection gate feature page and its runnable example (docs/features/) were written against rustev 0.7.0 and found four gaps in the sources a reader depends on. The support-routing package's committed definition cannot be compiled from the CLI, because its topic calibration is bound to a placeholder backend; an `--out` directory that does not exist is reported as a missing file inside it; `rustev.selection-gate/1`, `rustev.selection/1`, `rustev.baseline/1` and `rustev.repeat-config/1` have no published JSON Schema although hosts write and read them through the CLI and the Node binding; and nothing runs the page's example. This spec adds a CLI-ready synthetic definition to the package, makes the missing-directory refusal name the directory, emits schemas for those four documents from rustev-eval, and commits the page with its example under acceptance. No existing document, plan, golden or exit code changes meaning. Ratified by the owner on 2026-11-10 (A-92).\n",
     "title": "Source gaps found by the selection gate feature page (amends 006, 007, 027 and 029)"
   },
-  "shardHash": "1067b10b6084a1f87d2c9f19b4ab83e1f59ffda47049624d22c19f5500fb4a02",
+  "shardHash": "5aeb999f69f4bffae0a36e81c8d0dc5930bd3baba01b3058f97b6b09a484e485",
   "specVersion": "1.11.0"
 }

@@ -382,16 +382,25 @@ fn too_many_rules_files_are_refused_before_any_read() {
 }
 
 #[test]
+#[cfg(unix)]
 fn a_bundle_failure_after_the_decision_keeps_the_decision_fields() {
     let s = Scratch::new("run-bundle-fail");
     run_inputs(&s);
+    // The directory exists (spec 072, 3.2) but refuses the write, which
+    // therefore fails only after the decision.
+    std::fs::create_dir(s.path("read-only")).unwrap();
+    let mode = |m: u32| {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(s.path("read-only"), std::fs::Permissions::from_mode(m)).unwrap();
+    };
+    mode(0o555);
     let mut a = run_args("support", "b-1", "b.record.json");
     a.extend(
         [
             "--capture-bytes",
             "1048576",
             "--bundle-out",
-            "missing-dir/b.json",
+            "read-only/b.json",
             "--now-ms",
             "1800000000000",
             "--tenant",
@@ -406,10 +415,12 @@ fn a_bundle_failure_after_the_decision_keeps_the_decision_fields() {
         .iter()
         .map(|x| x.to_string()),
     );
-    let j = s.rustev_owned(&a).expect(3, "io_error");
+    let r = s.rustev_owned(&a);
+    mode(0o755);
+    let j = r.expect(3, "io_error");
     assert_eq!(j["completion"], "judged");
     assert_eq!(j["record"], "b.record.json");
     assert!(j.get("judgment").is_some());
-    assert_eq!(j["bundle_error"]["path"], "missing-dir/b.json");
+    assert_eq!(j["bundle_error"]["path"], "read-only/b.json");
     assert!(s.exists("b.record.json"));
 }

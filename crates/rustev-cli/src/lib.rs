@@ -16,6 +16,7 @@ mod explain;
 mod host;
 pub mod io;
 mod live;
+mod outputs;
 /// Command output, shared with every host (spec 027, 3.1).
 pub use rustev_surface::out;
 mod plan;

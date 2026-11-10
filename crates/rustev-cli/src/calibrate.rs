@@ -11,6 +11,9 @@ use crate::replay::{replay_config, resolver};
 
 pub fn fit(p: &Parsed) -> Result<Res, Usage> {
     let replay = replay_config(p)?;
+    if let Err(d) = crate::outputs::check(p) {
+        return Ok(Err(d));
+    }
     let reads = Reads::default();
     let resolver = resolver(p);
     Ok(rustev_surface::calibrate::fit(

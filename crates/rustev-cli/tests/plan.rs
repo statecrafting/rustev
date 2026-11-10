@@ -422,7 +422,15 @@ fn unreadable_inputs_are_io_errors_naming_the_path() {
         ],
         &SUPPORT_DEPS,
     ));
-    assert_eq!(r.expect(3, "io_error")["path"], "no-dir/p.json");
+    // Spec 072, 3.2: the missing output directory is named, before reading.
+    let j = r.expect(3, "io_error");
+    assert_eq!(
+        (&j["path"], &j["detail"]),
+        (
+            &serde_json::json!("no-dir"),
+            &serde_json::json!("output directory does not exist")
+        )
+    );
 }
 
 #[test]

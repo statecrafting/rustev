@@ -65,6 +65,9 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
     let n = validate(p)?;
     let split = crate::eval::split(p)?;
     let replay = crate::replay::replay_config(p)?;
+    if let Err(d) = crate::outputs::check(p) {
+        return Ok(Err(d));
+    }
     let reads = Reads::default();
     let resolver = crate::replay::resolver(p);
     let mut rules = vec![];
@@ -101,6 +104,9 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
 
 pub fn baseline(p: &Parsed) -> Result<Res, Usage> {
     let now = crate::host::now(p)?.as_ms();
+    if let Err(d) = crate::outputs::check(p) {
+        return Ok(Err(d));
+    }
     Ok(rustev_surface::repeat::baseline(
         &p.name(),
         &Reads::default(),
@@ -114,6 +120,7 @@ pub fn baseline(p: &Parsed) -> Result<Res, Usage> {
 }
 
 pub fn compare(p: &Parsed) -> Res {
+    crate::outputs::check(p)?;
     let args = rustev_surface::repeat::CompareArgs {
         baseline: p.req("baseline"),
         baseline_eval: p.req("baseline-eval"),
@@ -127,6 +134,7 @@ pub fn compare(p: &Parsed) -> Res {
 }
 
 pub fn select(p: &Parsed) -> Res {
+    crate::outputs::check(p)?;
     let mut done = rustev_surface::repeat::select(
         &p.name(),
         &Reads::default(),
@@ -167,6 +175,9 @@ pub fn select(p: &Parsed) -> Res {
 pub fn import(p: &Parsed) -> Result<Res, Usage> {
     if p.many("run").len() > 64 {
         return usage("--run is given 1 to 64 times");
+    }
+    if let Err(d) = crate::outputs::check(p) {
+        return Ok(Err(d));
     }
     Ok(rustev_surface::repeat::import(
         &p.name(),

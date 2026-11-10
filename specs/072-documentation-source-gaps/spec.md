@@ -225,6 +225,31 @@ with `synthetic-example.rules.json` and `synthetic-example.calibration.json`
 alone (plan `sha256:7e0b9ae5…`). The file joins the package's reviewed
 archive list (`tools/rustev-release/archive-policy.json`).
 
+**Increment 2 (2026-11-10).** The output-directory precheck (3.2) lives in
+the CLI host, `crates/rustev-cli/src/outputs.rs`: `outputs::check` derives
+from the parsed flags the directories a command writes into (the `--out`
+directory of `eval`, `eval candidates`, `eval diff`, `eval repeat import`
+and `calibrate fit`; the parent of every other `--out` file, of `--markdown`,
+`--record-out`, `--bundle-out` and `--ledger-out`, of the run directory
+`eval live` creates and of the journal it may create; and the `--store` a
+`run` with `--retain external` writes) and refuses the first that is
+missing (`output directory does not exist`) or not a directory (`is not a
+directory`) with exit 3 `io_error` naming it as given. Each command calls
+it after its usage rules, so usage errors keep their precedence, and
+before its first read and its no-clobber checks. No command writes into a
+`--bundles` directory today; capture's output is `run --bundle-out`. The
+check stays in the CLI rather than `rustev-surface` because the Node and
+WebAssembly hosts have their own (or no) directories and this spec amends
+only spec 006. `crates/rustev-cli/tests/io.rs` covers `eval --out
+missing/`, `run --bundle-out missing/x.json`, `plan compile --out
+missing/plan.json`, a regular file given as the directory, and an existing
+directory keeping the input refusal. Two existing assertions that relied
+on a missing output directory change with 3.2: `tests/plan.rs` now expects
+the directory named, and `tests/run.rs` and `tests/eval.rs` reach their
+post-decision bundle failure and adapter refusal through a read-only and
+an existing directory. No golden or conformance case changed. `src/outputs.rs` joins the CLI's
+reviewed archive list (`tools/rustev-release/archive-policy.json`).
+
 **Increment 3, step 1 (2026-11-10, test only).** `rustev-eval`'s
 `tests/dependencies.rs` pins its normal dependencies exactly. So that the
 dependency-only change adding `schemars` passes on its own, the test accepts
