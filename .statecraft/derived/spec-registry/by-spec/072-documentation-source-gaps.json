@@ -1,0 +1,140 @@
+{
+  "record": {
+    "amends": [
+      "006-cli-surface",
+      "007-support-routing-package",
+      "027-node-and-wasm-bindings",
+      "029-evaluation-repeatability"
+    ],
+    "created": "2026-11-10",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "006-cli-surface",
+      "007-support-routing-package",
+      "027-node-and-wasm-bindings",
+      "029-evaluation-repeatability"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "docs/features/",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "007-support-routing-package",
+        "unit": {
+          "kind": "directory",
+          "path": "packages/rustev-pkg-support-routing/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      }
+    ],
+    "id": "072-documentation-source-gaps",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-a-cli-ready-synthetic-definition",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "`packages/rustev-pkg-support-routing/data/synthetic-example.definition.json` is the package's definition for its reference thresholds with `topic` bound to the committed synthetic example calibration; `rustev plan compile` accepts it with the committed example rules and calibration and no other input, and a package test fails when the committed bytes differ from the builder's output."
+      },
+      {
+        "anchor": "3-2-a-missing-output-directory-is-named",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A command given an output directory, or an output file whose parent directory, does not exist is refused with exit 3 `io_error` before reading any input, naming that directory and stating that it does not exist; existing directories and every other refusal keep their bytes."
+      },
+      {
+        "anchor": "3-3-schemas-for-the-selection-documents",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "`rustev-eval` emits a JSON Schema (draft 2020-12) for `rustev.selection-gate/1`, `rustev.selection/1`, `rustev.baseline/1` and `rustev.repeat-config/1` from the types its parsers use, committed under `crates/rustev-eval/schema/` and checked byte for byte by a test; the schemas are descriptive and the bounded parsers remain the only authority on validity."
+      },
+      {
+        "anchor": "3-4-the-feature-page-and-its-example",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "This spec's acceptance builds the CLI and runs `docs/features/selection-gate/example/run.sh`, which exits 0 only when both gates' verdicts and rule results equal the committed expected files."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "072-source-gaps-found-by-the-selection-gate-feature-page-amends-006-007-027-and-029": "b38c8a7b42be0c98b50657104d65191bd4c3695f56ad8707bfaba38ac0717497",
+      "1-purpose": "01ec282f05bf1a99f2a4019d0ded773d53fde539e9cf3e08be38a59aa62bbe85",
+      "2-territory": "6ceff4f374ceaa270b228c2ba4037372d5d1e3f9e7e28fcdf41166c6de4b142e",
+      "3-1-a-cli-ready-synthetic-definition": "0211331883961c80be44017d807adebcbd3f055e9e63c4e7899ca2ec449f9502",
+      "3-2-a-missing-output-directory-is-named": "6f127eac517fc8fe0e7ac0db94c4f1fc4a9790d951843706bea20beece90c61b",
+      "3-3-schemas-for-the-selection-documents": "48e31d22e6108df0562fee25d34e8a730e1110304356fd34ff0062b32a7a1a48",
+      "3-4-the-feature-page-and-its-example": "5f8a517c7c0bcae5450e693df3d5f07b7d79cca0c8e9be4809adf9dbaaea9241",
+      "3-behavior": "27aaa838ec4123dd660530e092262ca61a6241438644af6168472244fed47fd1",
+      "4-out-of-scope": "1661f1b64c6d04292ebe07382a12224f57d617828f9c9df187241adaf9f040d8",
+      "5-observable-negative-cases": "62432a1a7b52bdc3ccd5d52a02d1ba97c68780a82d5b78046d6965684a701c36",
+      "acceptance": "a6c204457bea1bcbcbd6fe1ed3648c06823de7404353c6ee191934fc729178ba",
+      "implementation-record": "2ea6d4c30dab7fd8e0aa283b3ee1e2f961ec63bab3de1850237748a82f2aff3c",
+      "verification": "563336deb87106bb44ed525934ca68f08c0adb6bd3a778c47d7f11946f85c4d0"
+    },
+    "sectionHeadings": [
+      "072: Source gaps found by the selection gate feature page (amends 006, 007, 027 and 029)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 A CLI-ready synthetic definition",
+      "3.2 A missing output directory is named",
+      "3.3 Schemas for the selection documents",
+      "3.4 The feature page and its example",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record"
+    ],
+    "specPath": "specs/072-documentation-source-gaps/spec.md",
+    "status": "approved",
+    "summary": "The selection gate feature page and its runnable example (docs/features/) were written against rustev 0.7.0 and found four gaps in the sources a reader depends on. The support-routing package's committed definition cannot be compiled from the CLI, because its topic calibration is bound to a placeholder backend; an `--out` directory that does not exist is reported as a missing file inside it; `rustev.selection-gate/1`, `rustev.selection/1`, `rustev.baseline/1` and `rustev.repeat-config/1` have no published JSON Schema although hosts write and read them through the CLI and the Node binding; and nothing runs the page's example. This spec adds a CLI-ready synthetic definition to the package, makes the missing-directory refusal name the directory, emits schemas for those four documents from rustev-eval, and commits the page with its example under acceptance. No existing document, plan, golden or exit code changes meaning. Ratified by the owner on 2026-11-10 (A-92).\n",
+    "title": "Source gaps found by the selection gate feature page (amends 006, 007, 027 and 029)"
+  },
+  "shardHash": "a73dbdce94623cef2499fcc0023e6885aa656e2eaa673f3cb8fd46e31670486a",
+  "specVersion": "1.11.0"
+}
