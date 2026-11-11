@@ -46,6 +46,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # 027 and 043 are near their limit (2026-11-07).
 # 070 joins integrations-base beside 038, the spec it amends (spec 070,
 # Increments, item 3).
+# 072 joins selection beside 029, the spec it amends: its example runs the
+# selection gate end to end with the debug CLI (spec 072, increment 5).
 # 2026-11-05: the runner limit rose to 500 jobs, so the three groups over
 # 25 minutes split in two on that day's queue run (per-spec seconds:
 # cli-backends 2,200, integrations-base 2,172, integrations-core 1,611).
@@ -58,7 +60,7 @@ GROUPS = {
     "evaluation": "004".split(),
     "cli-backends": "006 014 041".split(),
     "cli-repeat": "001 005 011".split(),
-    "selection": "029 061 064 065".split(),
+    "selection": "029 061 064 065 072".split(),
     "integrations-base": "002 010 033 038 040 042 070".split(),
     "integrations-remote": "012 015 017 019 020 030 059".split(),
     "integrations-core": "021 036 037 045 060".split(),

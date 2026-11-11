@@ -11,6 +11,8 @@
 set -eu
 
 RUSTEV=${RUSTEV:-rustev}
+# A relative path to the binary still works after the script changes directory.
+case $RUSTEV in */*) RUSTEV=$(CDPATH='' cd -- "$(dirname -- "$RUSTEV")" && pwd -P)/$(basename -- "$RUSTEV") ;; esac
 HERE=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 DATA=$(pwd -P)/packages/rustev-pkg-support-routing/data
 [ -d "$DATA" ] || { echo "run from the repository root" >&2; exit 2; }
