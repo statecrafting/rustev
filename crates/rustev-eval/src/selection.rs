@@ -25,7 +25,7 @@ pub const SELECTION: &str = "rustev.selection/1";
 pub const MAX_GATE_ITEMS: usize = 1024;
 pub const MAX_METRIC_NAME: usize = 256;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SelectionGate {
     pub schema: String,
@@ -40,17 +40,19 @@ pub struct SelectionGate {
     pub rank_by: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "crate::integrity::present")]
+    // Absent or an object; the parser refuses `null`.
+    #[schemars(with = "crate::integrity::Integrity")]
     pub integrity: Option<crate::integrity::Integrity>,
 }
 crate::doc::eval_document!(SelectionGate, SELECTION_GATE, DESCRIPTOR_V1, ContentDigest);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Per {
     Variant,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(untagged, deny_unknown_fields)]
 pub enum MetricClause {
     CaseRegressions {
@@ -67,36 +69,36 @@ pub enum MetricClause {
         better_than: BaselineTarget,
     },
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BaselineTarget {
     Baseline,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CaseRegressionLimit {
     pub by: AbsoluteDrop,
     pub at_most: u64,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AbsoluteDrop {
     pub absolute: Decimal,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Within {
     Noise,
     Absolute(Decimal),
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(untagged, deny_unknown_fields)]
 pub enum Clause {
     Metric(MetricClause),
     AllSlices { all_slices: MetricClause },
     HeldOut { held_out: HeldOutLimit },
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HeldOutLimit {
     pub max_evaluations: u64,
@@ -186,7 +188,7 @@ impl SelectionGate {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Selection {
     pub schema: String,
@@ -198,7 +200,7 @@ pub struct Selection {
 }
 crate::doc::eval_document!(Selection, SELECTION, REPLAY_V1);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CandidateSelection {
     pub name: String,
@@ -206,14 +208,14 @@ pub struct CandidateSelection {
     pub verdict: Verdict,
     pub clauses: Vec<ClauseResult>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Verdict {
     Qualifies,
     Rejected { clause: String },
     Unknown { clause: String },
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ClauseResult {
     pub clause: String,
@@ -225,22 +227,24 @@ pub struct ClauseResult {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "case_regressions::read_cases"
     )]
+    // Absent, `null` or the per-case results.
+    #[schemars(with = "Option<CaseResults>")]
     pub cases: Option<Option<CaseResults>>,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SliceResult {
     pub slice: String,
     pub result: ClauseOutcome,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ClauseOutcome {
     Pass { reason: String },
     Fail { reason: String },
     Unknown { reason: String },
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Unranked {
     pub name: String,

@@ -32,7 +32,7 @@ use rustev_contract::scope::Handle;
 pub const REPEAT_REPORT: &str = "rustev.repeat-report/1";
 
 /// Where a repeat set's runs came from (3.1.2).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Source {
     /// One set of retained bundles reproduced N times.
@@ -44,7 +44,7 @@ pub enum Source {
 }
 
 /// A split's fixed role (3.7.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SplitRole {
     Train,
@@ -145,7 +145,7 @@ pub struct RepeatReport {
 crate::doc::eval_document!(RepeatReport, REPEAT_REPORT, REPLAY_V1);
 
 /// The record digests of one run's documents and the seed handed to it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunRef {
     pub report: ContentDigest,
@@ -158,7 +158,7 @@ pub struct RunRef {
 
 /// The held-out record (3.7.4). Without a ledger the count is unknown,
 /// never zero.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HeldOut {
     Unknown {
@@ -168,7 +168,7 @@ pub enum HeldOut {
     Counted(HeldOutRecord),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CohortStatus {
     Reported,
@@ -192,7 +192,7 @@ pub struct CohortReport {
 
 /// Whether a latency, queue or cost figure was observed by the evaluated
 /// plan (3.11.2).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Observation {
     Candidate,
@@ -215,28 +215,28 @@ pub struct MetricReport {
     pub band: BandDoc,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum FigureDoc {
     Value(f64),
     Unknown(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum IntervalDoc {
     Bounds { lower: f64, upper: f64 },
     Unknown { reason: String, undefined: u64 },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum BandDoc {
     Value { value: f64, basis: BasisDoc },
     Unknown(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BasisDoc {
     KSd,

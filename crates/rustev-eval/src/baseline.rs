@@ -28,7 +28,7 @@ pub const BASELINE: &str = "rustev.baseline/1";
 /// The longest baseline name.
 pub const MAX_NAME: usize = 64;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Baseline {
     pub schema: String,
@@ -57,7 +57,7 @@ pub struct Baseline {
 
 crate::doc::eval_document!(Baseline, BASELINE, REPLAY_V1);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BaselineCohort {
     pub name: String,
@@ -65,7 +65,7 @@ pub struct BaselineCohort {
     pub metrics: Vec<BaselineMetric>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BaselineMetric {
     pub name: String,

@@ -230,3 +230,28 @@ archive list (`tools/rustev-release/archive-policy.json`).
 dependency-only change adding `schemars` passes on its own, the test accepts
 either exact list, with or without `schemars`, until the schema change
 tightens it to the list with `schemars`. No claim of spec 004 changes.
+**Increment 3 (2026-11-10).** `rustev-eval` takes the workspace's
+`schemars` as a normal dependency (its own pull request; spec 004's
+dependency test `crates/rustev-eval/tests/dependencies.rs` now lists it)
+and `jsonschema` as a dev-dependency. `rustev_eval::doc::document_schemas`
+(`crates/rustev-eval/src/doc.rs`, now a public module, so the archive file
+list is unchanged) emits the four schemas as spec 027 3.2.2 does: draft
+2020-12, `schema` fixed to the version, `x-rustev-parse-limits`, canonical
+bytes. `JsonSchema` is derived on `RepeatConfig` and its members
+(`repeat_config.rs`), `Baseline`, `BaselineCohort` and `BaselineMetric`
+(`baseline.rs`), the repeat report members a baseline embeds (`repeat.rs`),
+`HeldOutRecord` (`holdout.rs`), `AdapterRules` and `Direction`
+(`config.rs`), `Integrity` (`integrity.rs`), the gate, clause, selection
+and verdict types (`selection.rs`) and the per-case results
+(`selection/case_regressions.rs`, the generic list named `CaseListOf{T}`);
+contract types (`Decimal`, the digests and identities, `Handle`, `Split`,
+`DatasetProvenance`) reuse their own schemas. No manual `JsonSchema` impl
+was needed: the three fields read by a custom deserializer carry a
+`schemars(with)` override instead (`SelectionGate.integrity` and
+`Integrity`'s two bounds are absent or a value, never `null`;
+`ClauseResult.cases` is absent, `null` or the results). The committed
+files are `crates/rustev-eval/schema/rustev.{baseline,repeat-config,selection,selection-gate}-1.schema.json`;
+`crates/rustev-eval/tests/schemas.rs` checks them byte for byte
+(`RUSTEV_BLESS=1` rewrites them), that every object is closed, the gate's
+members, the verdict's three shapes, and that every committed document of
+the four versions validates. No serialized byte changes.

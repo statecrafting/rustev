@@ -18,7 +18,7 @@ pub mod comparison;
 pub mod config;
 pub mod dataset;
 pub mod diff;
-mod doc;
+pub mod doc;
 pub mod dynamic;
 pub mod eval_cases;
 pub mod explain;

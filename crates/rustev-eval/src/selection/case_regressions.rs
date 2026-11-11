@@ -5,7 +5,7 @@ use crate::repeat_stats::{Form, MetricCases, run_stats};
 
 const LIST_LIMIT: usize = 10_000;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CaseResults {
     pub compared: u64,
@@ -13,8 +13,9 @@ pub struct CaseResults {
     pub regressions: CaseList<Regression>,
     pub unresolved: CaseList<UnresolvedCase>,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "CaseListOf{T}")]
 pub struct CaseList<T> {
     pub total: u64,
     pub truncated: bool,
@@ -37,7 +38,7 @@ impl<T> CaseList<T> {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Regression {
     pub case: String,
@@ -45,7 +46,7 @@ pub struct Regression {
     pub candidate: f64,
     pub drop: String,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UnresolvedCase {
     pub case: String,

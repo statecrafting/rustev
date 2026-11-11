@@ -26,7 +26,7 @@ pub const MAX_RESAMPLES: u64 = 100_000;
 /// The top-k bound (3.2.4).
 pub const MAX_TOP_K: u64 = 100;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RepeatConfig {
     pub schema: String,
@@ -39,7 +39,7 @@ pub struct RepeatConfig {
 
 crate::doc::eval_document!(RepeatConfig, REPEAT_CONFIG, REPLAY_V1, ContentDigest);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BootstrapSpec {
     pub method: String,
@@ -52,7 +52,7 @@ pub struct BootstrapSpec {
     pub seed: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Noise {
     pub rule: BandRule,
@@ -60,7 +60,7 @@ pub struct Noise {
     pub overrides: BTreeMap<String, NoiseOverride>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NoiseOverride {
     pub rule: BandRule,
@@ -68,21 +68,21 @@ pub struct NoiseOverride {
 }
 
 /// `{ "k_sd": { "k": decimal } }` or `"interval_width"` (3.5.1).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BandRule {
     KSd(KSd),
     IntervalWidth,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct KSd {
     /// In (0, 10].
     pub k: Decimal,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SliceSpec {
     pub name: String,
@@ -90,7 +90,7 @@ pub struct SliceSpec {
     pub min_cases: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TopK {
     pub param: String,

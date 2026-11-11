@@ -54,7 +54,7 @@ pub struct LedgerEntry {
 /// What one held-out repeat report records (3.7.4): the entries with this
 /// lineage, with this plan and in total, each including the new one, and
 /// the heads before and after (none for an empty ledger).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HeldOutRecord {
     pub lineage: Handle,
