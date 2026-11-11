@@ -1,0 +1,28 @@
+{
+  "schema": "rustev.selection-gate/1",
+  "gate": "promote-routing",
+  "per": "variant",
+  "metrics": {
+    "acceptance_coverage": "higher_is_better",
+    "error_among_accepted": "lower_is_better"
+  },
+  "min_comparable_coverage": "1",
+  "min_labeled_coverage": "0",
+  "require": [
+    {
+      "metric": "error_among_accepted",
+      "not_worse_than": "baseline",
+      "within": {
+        "absolute": "0"
+      }
+    },
+    {
+      "metric": "acceptance_coverage",
+      "not_worse_than": "baseline",
+      "within": "noise"
+    }
+  ],
+  "rank_by": [
+    "acceptance_coverage"
+  ]
+}

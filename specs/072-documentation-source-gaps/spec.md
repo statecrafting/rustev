@@ -26,7 +26,7 @@ amends:
   - "029-evaluation-repeatability"
 establishes:
   # Written by increment 4 (3.4).
-  - { kind: directory, path: "docs/features/", planned: true }
+  - { kind: directory, path: "docs/features/" }
 extends:
   # Increment 1: synthetic-example.definition.json and its test.
   - { spec: "007-support-routing-package", unit: { kind: directory, path: "packages/rustev-pkg-support-routing/" }, nature: additive }
@@ -255,3 +255,15 @@ files are `crates/rustev-eval/schema/rustev.{baseline,repeat-config,selection,se
 (`RUSTEV_BLESS=1` rewrites them), that every object is closed, the gate's
 members, the verdict's three shapes, and that every committed document of
 the four versions validates. No serialized byte changes.
+
+
+**Increment 4 (2026-11-10).** `docs/features/selection-gate.md` and
+`docs/features/selection-gate/example/` are committed. The example compiles
+`synthetic-example.definition.json` directly (increment 1), evaluates the
+baseline and two threshold variants by replay, and runs `gate select` with
+`gate.json` and `gate-strict.json`, comparing verdicts and rule results with
+`expected-gate.json` and `expected-gate-strict.json`. 072 joins
+`VERIFIED_SPECS` and an acceptance group with its last increment, because
+its Verification names increment 3's schema test. The page's field tables
+for the selection documents are still written by hand; the last increment
+points them at the schemas increment 3 published.

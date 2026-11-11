@@ -1,0 +1,72 @@
+{
+  "ranked": [
+    "route-more"
+  ],
+  "unranked": [],
+  "candidates": [
+    {
+      "name": "route-less",
+      "verdict": {
+        "rejected": {
+          "clause": "require[1]"
+        }
+      },
+      "clauses": [
+        {
+          "clause": "require[0]",
+          "result": {
+            "unknown": {
+              "reason": "error_among_accepted: zero denominator"
+            }
+          }
+        },
+        {
+          "clause": "require[1]",
+          "result": {
+            "fail": {
+              "reason": "case regressions exceed at_most"
+            }
+          }
+        },
+        {
+          "clause": "require[2]",
+          "result": {
+            "fail": {
+              "reason": "acceptance_coverage in all"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "route-more",
+      "verdict": "qualifies",
+      "clauses": [
+        {
+          "clause": "require[0]",
+          "result": {
+            "pass": {
+              "reason": "error_among_accepted in all"
+            }
+          }
+        },
+        {
+          "clause": "require[1]",
+          "result": {
+            "pass": {
+              "reason": "case regressions within at_most"
+            }
+          }
+        },
+        {
+          "clause": "require[2]",
+          "result": {
+            "pass": {
+              "reason": "acceptance_coverage in all"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
