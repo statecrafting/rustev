@@ -2,7 +2,7 @@
 id: "072-documentation-source-gaps"
 title: "Source gaps found by the selection gate feature page (amends 006, 007, 027 and 029)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-11-10"
 summary: >
   The selection gate feature page and its runnable example (docs/features/)
@@ -30,6 +30,8 @@ establishes:
 extends:
   # Increment 1: synthetic-example.definition.json and its test.
   - { spec: "007-support-routing-package", unit: { kind: directory, path: "packages/rustev-pkg-support-routing/" }, nature: additive }
+  # Increment 1: the new data file joins the package's reviewed archive list.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Increment 2: the output-directory precheck.
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # Increment 3: schema emission for spec 029's host documents.
@@ -65,8 +67,8 @@ obligations:
 
 # 072: Source gaps found by the selection gate feature page (amends 006, 007, 027 and 029)
 
-Approved: ratified by the owner on 2026-11-10 (A-92). Implementation not
-started.
+Approved: ratified by the owner on 2026-11-10 (A-92). Implementation in
+progress.
 
 ## 1. Purpose
 
@@ -212,6 +214,16 @@ Not started. Planned increments:
 3. `schemars` for `rustev-eval` (dependency-only pull request), then the
    schemas (3.3).
 4. The page, its example and acceptance (3.4).
+
+**Increment 1 (2026-11-10).** `data/synthetic-example.definition.json` is
+committed and exposed as `EXAMPLE_DEFINITION`. `tests/example.rs` builds it
+from `Params::with_topic` with the example calibration's identity and
+compares the committed bytes (`RUSTEV_BLESS=1` rewrites it with the other
+example files). It equals `support-routing.definition.json` with only the
+topic calibration reference changed, and `rustev plan check` accepts it
+with `synthetic-example.rules.json` and `synthetic-example.calibration.json`
+alone (plan `sha256:7e0b9ae5…`). The file joins the package's reviewed
+archive list (`tools/rustev-release/archive-policy.json`).
 
 **Increment 3, step 1 (2026-11-10, test only).** `rustev-eval`'s
 `tests/dependencies.rs` pins its normal dependencies exactly. So that the
