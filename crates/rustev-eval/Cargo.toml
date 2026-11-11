@@ -30,12 +30,16 @@ rustev-contract.workspace = true
 rustev-core = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
+# Spec 072, 3.3: the JSON Schemas of spec 029's host documents.
+schemars.workspace = true
 
 # The runtime, the rules backend and Tokio produce fixtures in tests only.
 [dev-dependencies]
 rustev-runtime.workspace = true
 rustev-backend-rules.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
+# Spec 072, 3.3: committed documents validate against the emitted schemas.
+jsonschema = { version = "=0.59.0", default-features = false }
 
 [lints]
 workspace = true
