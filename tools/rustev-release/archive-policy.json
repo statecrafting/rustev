@@ -343,6 +343,7 @@
         "src/lib.rs",
         "src/live.rs",
         "src/main.rs",
+        "src/outputs.rs",
         "src/plan.rs",
         "src/repeat.rs",
         "src/replay.rs",

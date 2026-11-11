@@ -36,6 +36,7 @@ pub fn check(p: &Parsed) -> Res {
     parameterized(p, None)
 }
 pub fn compile_cmd(p: &Parsed) -> Res {
+    crate::outputs::check(p)?;
     parameterized(p, Some(p.req("out")))
 }
 fn parameterized(p: &Parsed, output: Option<&str>) -> Res {
@@ -59,6 +60,7 @@ pub fn profile(p: &Parsed) -> Res {
     )
 }
 pub fn diff(p: &Parsed) -> Res {
+    crate::outputs::check(p)?;
     use rustev_surface::plan_diff::{DiffArgs, diff};
     let args = if p.has("left-plan") {
         DiffArgs::Plans {

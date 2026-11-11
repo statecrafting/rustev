@@ -144,6 +144,7 @@ fn refusal(command: &str, path: &str, item: &str, reason: &str, detail: &str) ->
 
 fn execute(p: &Parsed, q: &Query, config: Option<&rustev_eval::replay::ReplayConfig>) -> Res {
     let command = p.name();
+    crate::outputs::check(p)?;
     let reads = Reads::default();
     for path in [p.one("out"), p.one("markdown")].into_iter().flatten() {
         crate::io::ensure_absent(path).map_err(|e| Done::io(&command, e))?;

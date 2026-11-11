@@ -464,7 +464,9 @@ fn gates_pass_fail_and_stay_unknown() {
     );
     s.write("other.adapter.json", other.as_bytes());
     // The support configuration binds the original rules: refused before
-    // any case (spec 014, 3.2.2).
+    // any case (spec 014, 3.2.2). The output directory exists, so the
+    // refusal is the adapter's, not spec 072 3.2's.
+    std::fs::create_dir(s.path("refused")).unwrap();
     let mut a = eval_args(
         "support.dataset.json",
         "final_test",

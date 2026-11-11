@@ -76,6 +76,9 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
     let split = split(p)?;
     let replay = replay_config(p)?;
     forbid_candidate_deps(p)?;
+    if let Err(d) = crate::outputs::check(p) {
+        return Ok(Err(d));
+    }
     check_scores(p, &Reads::default())?;
     let reads = Reads::default();
     let resolver = resolver(p);
@@ -95,6 +98,9 @@ pub fn views(p: &Parsed) -> Result<Res, Usage> {
     let split = split(p)?;
     let replay = replay_config(p)?;
     forbid_candidate_deps(p)?;
+    if let Err(d) = crate::outputs::check(p) {
+        return Ok(Err(d));
+    }
     let reads = Reads::default();
     let resolver = resolver(p);
     let mut rules = vec![];
@@ -110,6 +116,9 @@ pub fn views(p: &Parsed) -> Result<Res, Usage> {
 /// `eval judge` (spec 041, 3.10.4).
 pub fn judge(p: &Parsed) -> Result<Res, Usage> {
     let replay = replay_config(p)?;
+    if let Err(d) = crate::outputs::check(p) {
+        return Ok(Err(d));
+    }
     let reads = Reads::default();
     let resolver = resolver(p);
     let mut rules = vec![];

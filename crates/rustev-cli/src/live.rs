@@ -183,6 +183,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
         p.need(&["resume"], "with --rerun-interrupted")?;
     }
     let result = (|| -> Result<Exit, Done> {
+        crate::outputs::check(p)?;
         let reads = Reads::default();
         let inputs = live::Inputs::new(&reads, sha256);
         let args = live::Args {
