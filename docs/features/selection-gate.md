@@ -44,8 +44,8 @@ choice, not the choice: Rustev never promotes a plan.
 | **Node** | `engine.gateSelect(inputs, args)` |
 | **WebAssembly** | Not available (the module has the single-run `gate` only) |
 | **Decision service** | Not available |
-| **Reads** | `rustev.selection-gate/1`, `rustev.baseline/1`, repeat sets from `rustev eval candidates` or `rustev eval repeat import` |
-| **Writes** | `rustev.selection/1` |
+| **Reads** | [`rustev.selection-gate/1`](../../crates/rustev-eval/schema/rustev.selection-gate-1.schema.json), [`rustev.baseline/1`](../../crates/rustev-eval/schema/rustev.baseline-1.schema.json), repeat sets from `rustev eval candidates` or `rustev eval repeat import` (configured by [`rustev.repeat-config/1`](../../crates/rustev-eval/schema/rustev.repeat-config-1.schema.json)) |
+| **Writes** | [`rustev.selection/1`](../../crates/rustev-eval/schema/rustev.selection-1.schema.json) |
 | **Conformance** | 5 cases, CLI and Node |
 
 ## When to use it
@@ -219,8 +219,11 @@ unknown when nothing was proposed.
 
 ## Writing a gate
 
-<!-- shape: hand-kept; no JSON schema is published for
-     rustev.selection-gate/1 yet (source gap). Meanings written. -->
+<!-- shape: checked against crates/rustev-eval/schema/rustev.selection-gate-1.schema.json.
+     Meanings written. -->
+
+The full shape is published as a JSON Schema,
+[`rustev.selection-gate-1.schema.json`](../../crates/rustev-eval/schema/rustev.selection-gate-1.schema.json).
 
 ```json
 {
@@ -281,10 +284,11 @@ unknown (`sr-m04: unpaired (baseline)`) rather than pass.
 
 ## Reading the result
 
-<!-- shapes: from the example's selection.json and spec 029 3.12.7; hand-kept
-     until rustev.selection/1 has a published schema (source gap) -->
+<!-- shapes: from the example's selection.json and spec 029 3.12.7; checked
+     against crates/rustev-eval/schema/rustev.selection-1.schema.json -->
 
-`rustev gate select` writes `rustev.selection/1`:
+`rustev gate select` writes `rustev.selection/1`
+([schema](../../crates/rustev-eval/schema/rustev.selection-1.schema.json)):
 
 ```json
 {
@@ -419,8 +423,8 @@ const { code, out, artifacts } = await engine.gateSelect(inputs, {
 | Try it: situation, tables | Written from the run | `expected-gate.json`, `expected-gate-strict.json`, the repeat report | the script's verdict check; review |
 | How a verdict is decided | Written | 029 §3.12.2–5, 065 §3.2 | requirement links; freshness |
 | Concepts | Written | 004 §3.5.4–5, 029 §3.3, §3.5 | freshness |
-| Writing a gate | Hand-kept shape, written meaning | `SelectionGate` in `rustev-eval` | needs a published schema (gap) |
-| Reading the result | Hand-kept shape | example output, 029 §3.12.7 | needs a published schema (gap) |
+| Writing a gate | Example shape, written meaning | `SelectionGate` in `rustev-eval` | published schema, `rustev-eval` `tests/schemas.rs` |
+| Reading the result | Example shape | example output, 029 §3.12.7 | published schema, `rustev-eval` `tests/schemas.rs` |
 | Exit codes | Derived | CLI exit-code table | CLI golden tests |
 | From Node | Derived | `GateSelectArgs` in `index.d.ts` | typings check |
 | Guarantees and limits | Written, linked | requirements of 029, 061, 064, 065 | requirement links; freshness |

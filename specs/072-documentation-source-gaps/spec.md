@@ -2,7 +2,7 @@
 id: "072-documentation-source-gaps"
 title: "Source gaps found by the selection gate feature page (amends 006, 007, 027 and 029)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-11-10"
 summary: >
   The selection gate feature page and its runnable example (docs/features/)
@@ -166,8 +166,8 @@ are fixed here rather than worked around in the page:
 3. The script compares verdicts and rule results, not bytes, because run
    records carry measured latency and digests differ between runs.
 4. This spec's Verification builds the CLI and runs the script with
-   `RUSTEV=target/debug/rustev`, so the merge queue fails when the page's
-   example stops matching the product.
+   `RUSTEV` set to the debug binary in cargo's target directory, so the
+   merge queue fails when the page's example stops matching the product.
 
 ## 4. Out of scope
 
@@ -202,12 +202,12 @@ cargo test -p rustev-pkg-support-routing --locked --test example
 cargo test -p rustev-cli --locked --test io
 cargo test -p rustev-eval --locked --test schemas
 cargo build -p rustev-cli --locked
-env RUSTEV=target/debug/rustev sh docs/features/selection-gate/example/run.sh
+sh -c 'd=$(cargo metadata --format-version 1 --no-deps --locked | jq -r .target_directory) && env RUSTEV="$d/debug/rustev" sh docs/features/selection-gate/example/run.sh'
 ```
 
 ## Implementation record
 
-Not started. Planned increments:
+Complete (2026-11-10). Planned increments:
 
 1. The synthetic definition (3.1).
 2. The output-directory precheck (3.2).
@@ -292,3 +292,14 @@ baseline and two threshold variants by replay, and runs `gate select` with
 its Verification names increment 3's schema test. The page's field tables
 for the selection documents are still written by hand; the last increment
 points them at the schemas increment 3 published.
+
+**Increment 5 (2026-11-10, acceptance).** 072 joins `VERIFIED_SPECS` and
+the `selection` acceptance group beside 029, the spec it amends, so the
+merge queue runs this spec's Verification, including the example script
+(R-2). The page links the four published schemas from its summary table
+and from the gate and result sections; the example shapes it shows stay as
+written illustrations, and the schemas are the reference.
+The Verification's last command now finds the debug binary through `cargo
+metadata`'s target directory instead of `target/debug/rustev`, which held
+only where the target directory is the default, and the script resolves a
+relative `RUSTEV` path before it changes into its work directory.

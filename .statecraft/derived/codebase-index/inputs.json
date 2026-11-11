@@ -37,7 +37,7 @@
       "contentHash": "68b9d356ffb92294787d8ab634c4d95b057162539c1a31216a774d90caf77e4c"
     },
     "Makefile": {
-      "contentHash": "b0da5ea291c3118b0c1859cf147ce5e89d0b08a4f55cc0077ecee9e6cb325cde"
+      "contentHash": "9e2ac5572267ecaaa32c2b34a23424ca1fc02eb79bbf1e8b97b7b7f0a127bb4b"
     },
     "README.md": {
       "contentHash": "a47b7e3004c0856ad1e05cb1bb9117babbfbb8b9e70951497df98dcdba09d54e"
@@ -109,7 +109,7 @@
       "contentHash": "c7df0ab376e0e837439039e52f433c68b312bea5ed89bfdd1e39a421b6ec2969"
     },
     "docs/features/selection-gate.md": {
-      "contentHash": "06e9f12b5b24d60018495149cf0c45cc7f0b143de35e426c6134b8d388052ec5"
+      "contentHash": "758699167ef1b5140b1d1728ac38a5127f0206f1916e01d71330af810c7ee526"
     },
     "docs/features/selection-gate/example/expected-gate-strict.json": {
       "contentHash": "5b42edab3131df7cec90a5277ea189a24420fac2c2d20ec69cb30baaa019a5c8"
@@ -127,7 +127,7 @@
       "contentHash": "5f6188b2d7fdf18cdf6a0b0a40443f138e9a6b95a29c95a5a419d51b90305c24"
     },
     "docs/features/selection-gate/example/run.sh": {
-      "contentHash": "a092000fc78c1c3515e1d40cb1af6429fee4df442a972cbde1ce2c063b04a8f6"
+      "contentHash": "085af543ad03464e0341e2f5a331b4b236c675efaf316f3466fe4ddba9ae0f39"
     },
     "integrations/rustev-otel/LICENSE": {
       "contentHash": "bd593de664ba50d42098c9259bcf314ccb8ba38865c45aaa8e049d8711aa22b8"
