@@ -39,7 +39,7 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # The option-bag fields, the `command` input names and `index.d.ts`.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: amending }
-  # Test fixtures only: the shared rules-first golden (3.7).
+  # Tests only: the shared rules-first golden and its test (3.7); no change under src/.
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: additive }
   # Conformance cases (3.7).
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
@@ -123,9 +123,9 @@ The `extends` edges, added at ratification:
 - `integrations/rustev-node/` (027, amending): the option-bag fields on
   `compile`/`compileSync`, the input names on `command('check' |
   'compile')`, the hand-written declarations in `index.d.ts`, and tests.
-- `crates/rustev-core/` (002, additive): test fixtures only, a committed
-  `fill: rules_first` golden that every surface's test compiles (3.7); no
-  source change.
+- `crates/rustev-core/` (002, additive): tests only, a committed
+  `fill: rules_first` golden that every surface's test compiles and the
+  test that pins it (3.7); no change to the crate's `src/`.
 - `tools/rustev-conformance/` (027, additive): cases for 3.7.
 - `Makefile` and `scripts/acceptance/` (001, additive): at completion, 073
   joins `make verify` and CI's `cli-backends` acceptance group beside 006.
@@ -187,8 +187,8 @@ in conflict are its refusal (3.4), never resolved by the surface.
    read under `DESCRIPTOR_V1` and templates under `DEFINITION_V1` (3.1),
    with 006 3.3.1's bounded reads. One command reads at most 4 096
    `--extract-rules` and 4 096 `--template` files, as for `--descriptor`;
-   beyond that it stops with `io_error` before reading any file, and these
-   files count toward 006 3.3.2's 256 MiB.
+   beyond that it stops with `io_error` before reading any file. The files
+   it does read count toward 006 3.3.2's 256 MiB.
 2. **Node, option bag (amends 027 3.3 and 063 3.2).** `compile` and
    `compileSync` gain two optional fields (027 3.3: "option bags may gain
    optional fields by later specs"):
@@ -235,14 +235,18 @@ in conflict are its refusal (3.4), never resolved by the surface.
    routes to instantiation and supplies either input is refused, naming
    the flag or field. When the instantiation is named by the arguments (a
    `profile`, `profileBases`, `variant`, `definitionVersion` or several
-   definitions), it is refused before any file is read: on the CLI as a
-   usage error (exit 2), on Node as `InvalidDocument`. When it is found in
-   the definition (a parameterized `rustev.definition/2` document, one
-   that declares `parameters` or `variants` under spec 034, the test of
-   `plan_command`; not a `rustev.prompt-template/1`), it is refused after the definition is read
+   definitions), it is a usage error, refused before any file is read: on
+   the CLI with exit 2; on Node as `InvalidDocument` from `compile`,
+   `compileSync` and `command('check' | 'compile')` alike, as every usage
+   rule of 063 3.2.2 is on the command path (a usage error has no output
+   bytes to return). When it is found in the definition (a parameterized
+   `rustev.definition/2` document, one that declares `parameters` or
+   `variants` under spec 034, the test of `plan_command`; not a
+   `rustev.prompt-template/1`), it is refused after the definition is read
    and before any dependency is read: on the CLI as `invalid_input` (exit
-   4, 006 3.2: a supplied input the plan does not use), on Node as
-   `InvalidDocument`. The core's `compile_profiled_with` takes no programs
+   4, 006 3.2: a supplied input the plan does not use); on Node,
+   `command('check' | 'compile')` returns those CLI bytes and exit code
+   (3.4.2), and `compile` and `compileSync` throw `InvalidDocument`. The core's `compile_profiled_with` takes no programs
    or templates, and this spec does not add a core entry point (decision 2
    at approval).
 
