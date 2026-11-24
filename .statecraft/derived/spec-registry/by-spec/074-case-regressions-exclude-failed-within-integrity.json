@@ -29,7 +29,7 @@
         "anchor": "3-2-excluded-cases",
         "id": "I-2",
         "kind": "invariant",
-        "text": "Under `exclude_failed_within_integrity`, a case is excluded only when it would be unresolved under 064 3.2.5 and, on each side, it is either measured with a known value in every run or every run lacking a measure for it counts it as an upstream failure under 065 3.2.2 or 3.2.4 with no unknown measure in any run; an excluded case is never compared, never counted as a regression or a non-regression, and is listed with its side."
+        "text": "Under `exclude_failed_within_integrity`, a case is excluded only when it would be unresolved under 064 3.2.5 and, on each side, it is either measured with a known value in every run or every run lacking a measure for it counts it as an upstream failure under 065 3.2.2 or 3.2.4 with no unknown measure in any run; an excluded case is never compared, never counted as a regression or a non-regression, and is listed with its excused side, the baseline when both sides are excused."
       },
       {
         "anchor": "3-1-the-member",
@@ -48,10 +48,10 @@
       }
     ],
     "sectionDigests": {
-      "074-selection-gate-case-regressions-may-leave-out-cases-that-failed-within-the-integrity-allowance-amends-064-and-065": "9d98886405a4d38207e300e746651bbc4256cbddbe352cf79f01ce0565832309",
+      "074-selection-gate-case-regressions-may-leave-out-cases-that-failed-within-the-integrity-allowance-amends-064-and-065": "e369cc5d2d13b3e1d64f41013acd388d6bd14c9a15afa109d8c553d389277da9",
       "1-purpose": "97464c928b567f6d8bdc090127a059a09358c0f2e14ee67d2d07786dc7163f83",
       "2-1-binding-principles": "3a05748f44bb19a7f5ccd18af830371913adde69c45abddd84b5c40f42a9056a",
-      "2-territory": "0fd3df2743e2e4192b9e877df57b828aab386b5c8d1bfac95d253ac6b1ea34c8",
+      "2-territory": "508e0d5c9cb6406ca5ff6e5bafbaa8adb699a6fcc9dcde0e50237eae8ea63099",
       "3-1-the-member": "f46c7957b56260478df729ff86d48c53044f5291ce791da611a1552eeb7d5157",
       "3-2-excluded-cases": "2b2e98dc1a3afe747227a5accebbffa599e175a9c9f5c97ecf3f6eb43c86b389",
       "3-3-clause-result-amends-064-3-4-1": "8821af9b3ad8e54d2dd29b84ab7fdfed459e46dc4ce7390848651eb16bd52a5f",
@@ -90,6 +90,6 @@
     "summary": "A proposed amendment of approved specs 064 (3.1, 3.2.5, 3.5, 3.6) and 065 (3.3.4), for #597, targeting release 0.8.0. A selection gate that declares both a spec 065 `integrity` allowance for upstream failures and a spec 064 `case_regressions` clause can never qualify a candidate that uses the allowance: a case that failed upstream has no measure on that side, so 064 makes it `unpaired` or `partial`, the clause is unknown unless it already fails, and the candidate ends `unknown` (exit 12) or `rejected`. This spec adds an opt-in member to the clause, `unresolved: \"exclude_failed_within_integrity\"`, allowed only when the gate declares `integrity.max_upstream_failures`. With it, a case that would be unresolved only because of upstream failures that 065 counts is left out of the clause and counted as `excluded`, never compared and never a regression or a non-regression; every other unresolved case keeps 064's meaning. Without the member, every gate, selection, stdout and exit code keeps its bytes.\n",
     "title": "Selection gate: case regressions may leave out cases that failed within the integrity allowance (amends 064 and 065)"
   },
-  "shardHash": "dba06696f925e2de6b1d4f5486e599af12f80137f4ce9938760deddd4bca116c",
+  "shardHash": "f4ffaa5c64f52132e16eb7bc0e2b0cdff5085dc8801c50118b6a19f2ff7d4e3b",
   "specVersion": "1.11.0"
 }

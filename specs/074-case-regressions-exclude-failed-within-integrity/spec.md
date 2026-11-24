@@ -41,7 +41,7 @@ obligations:
     anchor: "3-6-compatibility"
   - id: "I-2"
     kind: invariant
-    text: "Under `exclude_failed_within_integrity`, a case is excluded only when it would be unresolved under 064 3.2.5 and, on each side, it is either measured with a known value in every run or every run lacking a measure for it counts it as an upstream failure under 065 3.2.2 or 3.2.4 with no unknown measure in any run; an excluded case is never compared, never counted as a regression or a non-regression, and is listed with its side."
+    text: "Under `exclude_failed_within_integrity`, a case is excluded only when it would be unresolved under 064 3.2.5 and, on each side, it is either measured with a known value in every run or every run lacking a measure for it counts it as an upstream failure under 065 3.2.2 or 3.2.4 with no unknown measure in any run; an excluded case is never compared, never counted as a regression or a non-regression, and is listed with its excused side, the baseline when both sides are excused."
     anchor: "3-2-excluded-cases"
   - id: "I-3"
     kind: invariant
@@ -96,6 +96,10 @@ Proposed `extends` edges, added at ratification as 064 and 065 did:
 - `Makefile` and `scripts/acceptance/` (001, additive): at completion, 074
   joins `make verify` and CI's `selection` acceptance group beside 064 and
   065.
+
+This spec's compiled shards under `.statecraft/derived/` are committed with
+it, as AGENTS.md requires; the AI review leaves that directory out
+(`review.exclude`), so they do not appear in its diff.
 
 Unchanged: `rustev-contract`, `rustev-core` and every plan, definition,
 `PlanId` and plan golden; every run, case, repeat, baseline and host

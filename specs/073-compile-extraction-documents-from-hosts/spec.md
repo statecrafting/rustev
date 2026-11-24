@@ -114,6 +114,10 @@ Proposed `extends` edges, added at ratification as 064 and 065 did:
 - `Makefile` and `scripts/acceptance/` (001, additive): at completion, 073
   joins `make verify` and CI's `cli-backends` acceptance group beside 006.
 
+This spec's compiled shards under `.statecraft/derived/` are committed with
+it, as AGENTS.md requires; the AI review leaves that directory out
+(`review.exclude`), so they do not appear in its diff.
+
 Unchanged: `rustev-contract` and every document, schema and generated
 binding type; `rustev-core`'s source and public API; the WebAssembly
 package (3.5); `plan show`, `run`, `replay` and every other command;
@@ -145,6 +149,13 @@ Two optional, repeatable inputs, each a list of documents:
 |---|---|---|---|
 | extraction programs | `rustev.extract-rules/1` or `/2` | `rustev_contract::extraction_documents::ExtractRules` | `DESCRIPTOR_V1` |
 | prompt templates | `rustev.prompt-template/1` | `rustev_contract::generation::PromptTemplate` | `DEFINITION_V1` |
+
+Each byte bound is the one the document type itself declares in
+`rustev-contract`, not a bound this spec chooses: `ExtractRules` is
+declared with `crate::limits::DESCRIPTOR_V1` and `PromptTemplate` with
+`crate::limits::DEFINITION_V1` (their `versioned_document!` and
+`document!` declarations), so a surface reads at most what the type's own
+parser accepts and refuses nothing the parser would accept.
 
 A list may hold documents the definition does not name; the core ignores
 them, as it does from Rust. Two programs or templates that the core finds
@@ -229,7 +240,9 @@ in conflict are its refusal (3.4), never resolved by the surface.
 3. **Order of refusals.** Inputs are read and parsed in the order
    definition, descriptors, rules programs, calibrations, extraction
    programs, templates, execution policy; the first failure is reported.
-   Compile refusals follow the core's phase order unchanged.
+   This is the order of error reporting only, and is independent of the
+   core function's parameter order in 3.3.2. Compile refusals follow the
+   core's phase order unchanged.
 
 ### 3.5 WebAssembly
 
