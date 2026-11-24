@@ -9,6 +9,9 @@ use crate::{
 use rustev_contract::{Document, limits::PLAN_V1, plan::Plan};
 use serde_json::Value;
 
+// A `Copy` bundle of borrowed arguments, built once per command; its size
+// is a handful of slices (spec 073 added two to `DepArgs`), never boxed.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy)]
 pub enum DiffArgs<'a> {
     Plans {

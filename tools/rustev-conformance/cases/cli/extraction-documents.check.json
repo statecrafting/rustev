@@ -1,0 +1,51 @@
+{
+  "argv": [
+    "plan",
+    "check",
+    "--definition",
+    "definition.json",
+    "--descriptor",
+    "descriptor.json",
+    "--extract-rules",
+    "program.json",
+    "--template",
+    "template.json"
+  ],
+  "command": "plan check",
+  "derived": [],
+  "exit": 0,
+  "id": "extraction-documents.check",
+  "inputs": [
+    {
+      "name": "definition.json",
+      "path": "tools/rustev-conformance/fixtures/cli/extraction-documents.check/definition.json",
+      "sha256": "eb216dac8bae269a5b5a636b29559e5f3d58dce27f37f74139d9e2c52630c38d"
+    },
+    {
+      "name": "descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/cli/extraction-documents.check/descriptor.json",
+      "sha256": "654dfafa809a2581468549e1f093ea66ebd1ea6e6614e10eb8dcceddfe21ff5e"
+    },
+    {
+      "name": "program.json",
+      "path": "tools/rustev-conformance/fixtures/cli/extraction-documents.check/program.json",
+      "sha256": "b536d5ca34fad72cd7c3b87bd0ff7e5bdcc7e0616b547e841b4c7cc212a4446f"
+    },
+    {
+      "name": "template.json",
+      "path": "tools/rustev-conformance/fixtures/cli/extraction-documents.check/template.json",
+      "sha256": "0cd8273e3c2bd8b3b49d9650fd111b6af9fce4d06e64be3f76bd7e43da7a4712"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/extraction-documents.check.json",
+      "normalize": [],
+      "sha256": "c39a9d462f274c07510849aac24d9d343340f268943a013bc1b4cf366f4706ea",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

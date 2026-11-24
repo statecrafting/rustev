@@ -61,6 +61,22 @@
       },
       {
         "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "010-integrations",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-serve/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "001-boundaries-and-authority",
         "unit": {
           "kind": "file",
@@ -114,7 +130,7 @@
       }
     ],
     "sectionDigests": {
-      "073-extraction-programs-and-prompt-templates-on-the-cli-s-and-the-node-binding-s-compile-amends-006-027-and-063": "5669fc756bc58b4a6ee51ef41d980257319e2c5d7def424500dc10b190156057",
+      "073-extraction-programs-and-prompt-templates-on-the-cli-s-and-the-node-binding-s-compile-amends-006-027-and-063": "6f2ade57d713fa443694113ef9bb81c3078e3b9e9d894e54a4994cbf9e0e9259",
       "1-purpose": "c90f20ee7e6fb69bc56be7b541f79660dbd4751436fcfc2ab7476119681ab50c",
       "2-1-binding-principles": "1a38bf5f0b2d7a8432cb6bd3abbba8d60f139d42da0275fc80b89a33f31b1f55",
       "2-territory": "bc433a341b973396f9315787cde5493bd106a0e83ee3ac790e06374b862fe9db",
@@ -130,6 +146,7 @@
       "5-observable-negative-cases": "a93cd18d567aed78be4a6e669164cf81e3841e6e9498aa851f3da51f9d4528ee",
       "acceptance": "a81f95523f19dbe9b94c436a4d5aaaf1b02cb1f1e1add4f94ac9c8f279585d5b",
       "decisions-at-approval": "669fbac318c01c0a6c0b64fb7d3ecd331a399e2dc339cf7af7c39a1efd42ce2b",
+      "implementation-record": "c2d544585191d2099a4a85612f3d6a2ea10013834d298f58a565f822edd6caa3",
       "increments": "55c5c9a211b38afd75fae1b8a9ab82d8dcacdd36b31cd4d35f2eca520e45c804",
       "verification": "bb991117a04c57839561cd7b4786964aa6497c0c0c978806e8034abc42bc3037"
     },
@@ -151,6 +168,7 @@
       "Increments",
       "Acceptance",
       "Verification",
+      "Implementation record",
       "Decisions at approval"
     ],
     "specPath": "specs/073-compile-extraction-documents-from-hosts/spec.md",
@@ -158,6 +176,6 @@
     "summary": "An amendment of approved specs 006 (3.4), 027 (3.3, 3.12) and 063 (3.2), for #598, ratified by the owner on 2026-11-24 (A-94) for release 0.8.0. `rustev-core` compiles a definition with supplied `rustev.extract-rules/1` and `/2` programs and `rustev.prompt-template/1` documents through `compile_with_extraction_documents`, but no host surface reaches it: the Node binding's `compile` takes descriptors, calibrations, sources and an execution policy only, and the CLI's `--rules` takes a rules backend program (spec 005), not an extraction program. A host that keeps its definitions and extraction programs in its own repository can therefore run a `fill: rules_first` plan from Node but cannot build one. This spec adds two optional, repeatable inputs, extraction programs and prompt templates, to `rustev plan check` and `rustev plan compile` (the flags `--extract-rules` and `--template`), to the Node binding's `compile`/`compileSync` option bag (`extractRules`, `templates`) and to its `command('check' | 'compile')`, each routed through `compile_with_extraction_documents`. Compile refusals keep the core's category codes on every surface, and a malformed document is refused as each surface already refuses a malformed descriptor. A call that supplies neither input calls what it calls today, so every existing plan, `PlanId`, golden and output keeps its bytes. No contract type, JSON Schema or generated binding type changes.\n",
     "title": "Extraction programs and prompt templates on the CLI's and the Node binding's compile (amends 006, 027 and 063)"
   },
-  "shardHash": "298e16aa0bde9868c0b66eb6ef185f04b61591290ca8bb1192f61cb090c5cda6",
+  "shardHash": "43894c23e8b9ffd813524d8f6152e9b21a846993905ae32b4364621ea9089473",
   "specVersion": "1.11.0"
 }

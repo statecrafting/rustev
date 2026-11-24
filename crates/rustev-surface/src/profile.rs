@@ -205,6 +205,26 @@ pub fn plan_command(
         };
     }
 
+    // Spec 073, 3.3.4: extraction programs and templates do not reach an
+    // instantiated compile in this version. The flag forms are refused as
+    // usage by each surface before any read; a template found in the
+    // definition is refused here, before any dependency is read.
+    if let Some(input) = [
+        ("extract-rules", dep_args.extract_rules),
+        ("template", dep_args.templates),
+    ]
+    .iter()
+    .find_map(|(name, labels)| labels.first().map(|l| (*name, l)))
+    {
+        return Err(Done::invalid(
+            command,
+            input.1,
+            format!(
+                "{} documents are not supported with a profile, a variant or a parameterized definition (spec 073, 3.3.4)",
+                input.0
+            ),
+        ));
+    }
     let selection = select_template(&i.definitions(), i.profile.as_deref(), args.pin)
         .map_err(|e| refused(command, &e))?;
     let names = selection.template.json["variants"]

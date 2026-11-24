@@ -43,6 +43,10 @@ extends:
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: additive }
   # Conformance cases (3.7).
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # Increment 1: the other `DepArgs` callers pass no documents; their
+  # surfaces are unchanged (3.5).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-serve/" }, nature: additive }
   # Adds 073 to `make verify` and CI's `cli-backends` group at completion.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
@@ -399,6 +403,39 @@ cargo test -p rustev-surface --locked
 # The conformance cases on the Rust runner; every other case unchanged.
 cargo test -p rustev-conformance --locked --test cli --test manifest
 ```
+
+## Implementation record
+
+- **Increment 1 (surface and CLI).** `rustev-surface`: `DepArgs` gains
+  `extract_rules` and `templates`, and `Deps` the parsed `programs` and
+  `templates`, read after calibrations in the order supplied, each under
+  its type's bound (`DESCRIPTOR_V1`, `DEFINITION_V1`), a malformed one a
+  category 1 refusal naming `extract-rules:<label>` or `template:<label>`
+  (3.1, 3.4.1, 3.4.3). `plan::compile_definition_bytes` calls
+  `compile_with_extraction_documents` when either list is non-empty and
+  exactly today's `compile` or `compile_with` otherwise (3.3.1, 3.3.2).
+  `profile::plan_command` refuses either input on the instantiation path
+  with `invalid_input`, after the definition is read and before any
+  dependency (3.3.4). `host::MAX_EXTRACT_RULES_FILES` and
+  `MAX_TEMPLATE_FILES` are 4 096. Every other caller of `DepArgs` (the
+  Node binding's commands, the WebAssembly package, the service's offline
+  path, the repeat commands) passes no documents and is unchanged.
+  `rustev-cli`: `--extract-rules` and `--template` on `plan check` and
+  `plan compile`, their file-count caps, the usage refusal with
+  `--profile`, `--profile-base`, `--variant`, `--definition-version` or a
+  second `--definition` (3.3.4), and the help text (3.2.1).
+  `rustev-core` tests: the shared golden under
+  `tests/golden/rules-first/` (definition, descriptor, `/2` program,
+  template, plan and `PlanId`) and `tests/rules_first_golden.rs`, which
+  also checks that the inputs are canonical and that document order and an
+  unnamed program change nothing (3.7). `rustev-cli` tests:
+  `tests/extraction_documents.rs`, covering each section 5 row the CLI
+  reaches, with goldens `extraction-documents.*.json`; the compiled plan is
+  the core golden byte for byte. Five conformance cases
+  (`extraction-documents.*`, surfaces `cli`) are harvested from those
+  goldens. `DiffArgs` keeps its `Copy` bundle under an allowed
+  `large_enum_variant`. No contract type, schema, generated binding type,
+  existing golden or existing conformance case changed.
 
 ## Decisions at approval
 

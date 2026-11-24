@@ -130,6 +130,17 @@ pub fn validate(p: &Parsed) -> Result<(), crate::args::Usage> {
         p.spec.path,
         ["plan", "check"] | ["plan", "compile"] | ["profile", "check"]
     ) {
+        // Spec 073, 3.3.4: extraction programs and templates reach only a
+        // concrete definition's compile in this version.
+        if let Some(flag) = ["extract-rules", "template"].iter().find(|f| p.has(f)) {
+            p.forbid(
+                &["profile", "profile-base", "variant", "definition-version"],
+                &format!("is not supported with --{flag} (spec 073, 3.3.4)"),
+            )?;
+            if p.many("definition").len() > 1 {
+                return usage(format!("--{flag} takes one --definition (spec 073, 3.3.4)"));
+            }
+        }
         if !p.has("profile") {
             p.forbid(
                 &["profile-base", "definition-version"],

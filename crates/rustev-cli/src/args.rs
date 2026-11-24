@@ -103,14 +103,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         path: &["plan", "check"],
         flags: flags!("definition": Many, "profile": One, "profile-base": Many,
                       "variant": One, "definition-version": One, "descriptor": Many, "rules": Many,
-                      "calibration": Many, "execution": One),
+                      "calibration": Many, "execution": One, "extract-rules": Many,
+                      "template": Many),
         required: &["definition"],
     },
     CommandSpec {
         path: &["plan", "compile"],
         flags: flags!("definition": Many, "profile": One, "profile-base": Many,
                       "variant": One, "definition-version": One, "descriptor": Many, "rules": Many,
-                      "calibration": Many, "execution": One, "out": One),
+                      "calibration": Many, "execution": One, "extract-rules": Many,
+                      "template": Many, "out": One),
         required: &["definition", "out"],
     },
     CommandSpec {
@@ -455,6 +457,8 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
 
   rustev version      (or rustev --version)
   rustev plan check   --definition F [--descriptor F]... [--rules F]... [--calibration F]... [--execution F]
+                      [--extract-rules F]... [--template F]...
+                      (--rules: a rules backend program; --extract-rules: an extraction program)
   rustev plan compile --definition F [...same...] --out F
                       [--profile F [--definition F]... [--profile-base F]...
                        [--definition-version X.Y.Z]] [--variant NAME] (also for check)

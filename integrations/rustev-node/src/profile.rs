@@ -163,6 +163,7 @@ pub fn command(name: &str, inputs: BTreeMap<String, Vec<u8>>, a: &Value) -> Resu
         descriptors: &descriptors,
         rules: &rules,
         calibrations: &calibrations,
+        ..Default::default()
     };
     let p = args(a, &ds, &bs, "profile", "variant");
     let mut hook = crate::commands::profile_rules_hook;

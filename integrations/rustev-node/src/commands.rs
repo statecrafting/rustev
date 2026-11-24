@@ -122,6 +122,7 @@ pub fn run(name: &str, inputs: BTreeMap<String, Vec<u8>>, a: &Json) -> Result<Co
         descriptors: &descriptors,
         rules: &rules,
         calibrations: &calibrations,
+        ..Default::default()
     };
     let store = Store {
         files: host.inputs(),
