@@ -5,7 +5,7 @@
     {
       "name": "store.plan.json",
       "path": "tools/rustev-conformance/fixtures/store/store.plan.json",
-      "sha256": "cc8821667657782d5976e4f53bfffcff870dc60210bedaa2f79395c66b4d2086"
+      "sha256": "a5a9d2f35831bd6dc0ebe81c66c65520666315d5809a795a6663a1c452fd6da3"
     },
     {
       "name": "support.snapshot.json",
@@ -50,7 +50,7 @@
       "file": "after.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/after.record.json",
       "normalize": [],
-      "sha256": "5cf50f0d8e7667dd77f1f10611dd9b4d495be77c418c73ff44a7b3833b733792"
+      "sha256": "be5463bba34aeeb977cb793fd22a15b9f47e15dd7742e44fd7d23d48f6adb010"
     },
     {
       "file": "after.result.json",
@@ -62,7 +62,7 @@
       "file": "cold.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/cold.record.json",
       "normalize": [],
-      "sha256": "bdbae97e4bbb09343da2f7e93337bd73a4bd57f47110fb2434b4e940471df223"
+      "sha256": "6be7fb24a9a90d734b180e6e424de3c2348dbabdffdc669776c203fc0fe2b120"
     },
     {
       "file": "cold.result.json",
@@ -74,7 +74,7 @@
       "file": "warm.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/warm.record.json",
       "normalize": [],
-      "sha256": "09c40576aeab234b324fb804a6086ec3477bb888cfedb1e45d379362c89d5621"
+      "sha256": "386805dff756f4603ac8e815fa43015025e9bd0dad35f841ab5a169bce32a43d"
     },
     {
       "file": "warm.result.json",

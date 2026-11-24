@@ -5,7 +5,7 @@
     {
       "name": "acquire-widen.plan.json",
       "path": "tools/rustev-conformance/fixtures/acquire/acquire-widen.plan.json",
-      "sha256": "c497abef47d04fe22d8ec31b882e64c2edc183e592772507944633f3b393fb15"
+      "sha256": "d1f22fe6ed8b56711d48f3a4318ebb9e520f415c1bf033cb07b751bb51acde39"
     },
     {
       "name": "catalog.source.json",
@@ -29,7 +29,7 @@
       "file": "widen.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-widen/widen.record.json",
       "normalize": [],
-      "sha256": "a09c0b449916398c50f6d01f3611f15b79f535941edacd613905a656372f3093"
+      "sha256": "1dce811f765188057675c6acb7c1829269f948123962f2e2255b1f16701555f4"
     },
     {
       "file": "widen.result.json",

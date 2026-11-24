@@ -15,7 +15,7 @@
     {
       "name": "capture-rules-first.plan.json",
       "path": "tools/rustev-conformance/fixtures/capture/capture-rules-first.plan.json",
-      "sha256": "7f100da42cff699ddf3270c498f4ec992153915c02d03a9370063e91bd6d45ac"
+      "sha256": "52a70c0bd4b7846123ae8e30845cdc32cde3f8c8bbaefa5d64aefe470cf8ffbb"
     }
   ],
   "mirrors": "crates/rustev-runtime/tests/extraction.rs",
@@ -24,19 +24,19 @@
       "file": "embedded.bundle.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-partial/embedded.bundle.json",
       "normalize": [],
-      "sha256": "3015ccac31401aba075036ccf6e74120c5a1592a4510ebbe18e0eab72f79ede4"
+      "sha256": "65af624860a4856b43b8b9fd6c9e13271f086656de060048073d0f1fc2bbcb9a"
     },
     {
       "file": "embedded.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-partial/embedded.record.json",
       "normalize": [],
-      "sha256": "cf3648b7544c5a00f137ee1463756c25019550a48fc61a4ac88c906f1647eb89"
+      "sha256": "7aa2fa9a45f1b473a583847caecc13d7b60ee1d48a0e3cb50fa070fd03ddff73"
     },
     {
       "file": "embedded.replay.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.rules-first-partial/embedded.replay.json",
       "normalize": [],
-      "sha256": "04b1d4987366aa029b170b19f7394ae794e7d5daf25a89c74ed532dcca5aaa8a"
+      "sha256": "0201aa1a65bd338ea2af921a259f74d24b4163979d497bfcaf6b6a0bdd172dc7"
     },
     {
       "file": "embedded.result.json",
