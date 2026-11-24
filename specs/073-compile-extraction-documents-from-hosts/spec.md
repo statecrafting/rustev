@@ -1,12 +1,13 @@
 ---
 id: "073-compile-extraction-documents-from-hosts"
 title: "Extraction programs and prompt templates on the CLI's and the Node binding's compile (amends 006, 027 and 063)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-24"
 summary: >
-  A proposed amendment of approved specs 006 (3.4), 027 (3.3, 3.12) and
-  063 (3.2), for #598, targeting release 0.8.0. `rustev-core` compiles a
+  An amendment of approved specs 006 (3.4), 027 (3.3, 3.12) and 063
+  (3.2), for #598, ratified by the owner on 2026-11-24 (A-94) for release
+  0.8.0. `rustev-core` compiles a
   definition with supplied `rustev.extract-rules/1` and `/2` programs and
   `rustev.prompt-template/1` documents through
   `compile_with_extraction_documents`, but no host surface reaches it: the
@@ -30,6 +31,21 @@ amends:
   - "006-cli-surface"
   - "027-node-and-wasm-bindings"
   - "063-node-binding-parity"
+extends:
+  # The dependency reader and the check/compile path the CLI and the Node
+  # binding's `command` share (3.2, 3.3).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: amending }
+  # `--extract-rules` and `--template` on `plan check` and `plan compile`.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # The option-bag fields, the `command` input names and `index.d.ts`.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: amending }
+  # Test fixtures only: the shared rules-first golden (3.7).
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: additive }
+  # Conformance cases (3.7).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # Adds 073 to `make verify` and CI's `cli-backends` group at completion.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "005-reference-backends"
@@ -63,9 +79,9 @@ obligations:
 
 # 073: Extraction programs and prompt templates on the CLI's and the Node binding's compile (amends 006, 027 and 063)
 
-Draft: a proposal, not a claim about code. Ratification (`approved`) is the
-owner's act; the questions it needs answered are listed at the end. The
-approved texts of 006, 027 and 063 are not edited; this spec records what it
+Approved: ratified by the owner on 2026-11-24 (A-94) for release 0.8.0,
+accepting every recommendation the draft wrote; the implementation is
+pending. The approved texts of 006, 027 and 063 are not edited; this spec records what it
 adds to them. Section numbers such as "063 3.2.1" refer to those specs.
 
 ## 1. Purpose
@@ -96,7 +112,7 @@ unnoticed. This spec closes that gap on the CLI and the Node binding.
 
 ## 2. Territory
 
-Proposed `extends` edges, added at ratification as 064 and 065 did:
+The `extends` edges, added at ratification:
 
 - `crates/rustev-surface/` (027, amending): the dependency reader and the
   `check`/`compile` path the CLI and the Node binding's `command` share
@@ -216,7 +232,7 @@ in conflict are its refusal (3.4), never resolved by the surface.
    any document is parsed: on the CLI as a usage error (exit 2) naming the
    flag, and on Node as `InvalidDocument` naming the field. The core's
    `compile_profiled_with` takes no programs or templates, and this spec
-   does not add a core entry point (Open question 2).
+   does not add a core entry point (decision 2 at approval).
 
 ### 3.4 Refusals
 
@@ -366,19 +382,18 @@ cargo test -p rustev-surface --locked
 cargo test -p rustev-conformance --locked --test cli --test manifest
 ```
 
-## Open questions for the owner
+## Decisions at approval
 
-1. **Release.** 0.8.0, per 021 3.2 (3.6.4). #598 asks for a 0.7.x patch;
-   that needs an owner decision that new optional inputs count as a
-   compatible correction. Recommended: 0.8.0.
-2. **Instantiated compiles.** Refuse extraction programs and templates
-   with a profile, variant or template definition in this version (3.3.4),
-   or add a core entry point `compile_profiled_with_documents` (additive in
-   `rustev-core`) so they work there too? Recommended: refuse now; add it
-   when a host needs it.
+Ratified by the owner on 2026-11-24 (A-94), with every question the draft
+left open answered as recommended:
+
+1. **Release.** 0.8.0, under spec 021 3.2: new CLI flags and Node option
+   fields are a public API change, which takes the minor version before
+   1.0 (3.6.4).
+2. **Instantiated compiles.** Extraction programs and templates with a
+   profile, variant or template definition are refused in this version
+   (3.3.4); no core entry point is added.
 3. **Names.** `--extract-rules` / `extractRules` and `--template` /
-   `templates`, as #598 suggests. Recommended: as written.
-4. **WebAssembly.** Leave the package unchanged (3.5), as 063 3.12 did, or
-   add the two arguments to its `compile`? Recommended: unchanged.
-5. **One spec per issue.** This spec covers #598 only; #597 is spec 074,
-   proposed in the same pull request. Recommended: keep them separate.
+   `templates` (3.2).
+4. **WebAssembly.** Unchanged (3.5), as 063 3.12 held.
+5. **One spec per issue.** This spec covers #598; #597 is spec 074.

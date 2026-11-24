@@ -16,8 +16,128 @@
       "063-node-binding-parity",
       "070-extract-rules-2"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-surface/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-node/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/acceptance/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-conformance/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-surface/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-node/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-conformance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
       {
         "locations": [
           {
@@ -33,8 +153,8 @@
       }
     ],
     "specId": "073-compile-extraction-documents-from-hosts",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "6dc5205200177d7e885b78fb198f9471a31204a6a385370fc5b2e7296b0978c1"
+  "shardHash": "80a75b802154919ae046cb6613acd7b960461b61d3ca65c7a388e43c93c46c39"
 }

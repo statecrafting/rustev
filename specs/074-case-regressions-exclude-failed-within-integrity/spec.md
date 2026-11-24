@@ -1,12 +1,13 @@
 ---
 id: "074-case-regressions-exclude-failed-within-integrity"
 title: "Selection gate: case regressions may leave out cases that failed within the integrity allowance (amends 064 and 065)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-24"
 summary: >
-  A proposed amendment of approved specs 064 (3.1, 3.2.5, 3.5, 3.6) and 065
-  (3.3.4), for #597, targeting release 0.8.0. A selection gate that declares
+  An amendment of approved specs 064 (3.1, 3.2.5, 3.5, 3.6) and 065
+  (3.3.4), for #597, ratified by the owner on 2026-11-24 (A-94) for
+  release 0.8.0. A selection gate that declares
   both a spec 065 `integrity` allowance for upstream failures and a spec 064
   `case_regressions` clause can never qualify a candidate that uses the
   allowance: a case that failed upstream has no measure on that side, so
@@ -23,6 +24,20 @@ summary: >
 amends:
   - "064-selection-gate-case-regressions"
   - "065-selection-gate-run-integrity"
+extends:
+  # The member, the exclusion, the output and the regenerated schemas.
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
+  # The clause's stdout summary gains `excluded`.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: amending }
+  # `gate select` goldens; no new flag.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
+  # One CLI conformance case.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # The selection gate feature page documents the member.
+  - { spec: "072-documentation-source-gaps", unit: { kind: directory, path: "docs/features/" }, nature: additive }
+  # Adds 074 to `make verify` and CI's `selection` group at completion.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "004-evaluation-and-replay"
   - "006-cli-surface"
@@ -51,9 +66,9 @@ obligations:
 
 # 074: Selection gate: case regressions may leave out cases that failed within the integrity allowance (amends 064 and 065)
 
-Draft: a proposal, not a claim about code. Ratification (`approved`) is the
-owner's act; the questions it needs answered are listed at the end. The
-approved texts of 064 and 065 are not edited; this spec records what it adds
+Approved: ratified by the owner on 2026-11-24 (A-94) for release 0.8.0,
+accepting every recommendation the draft wrote; the implementation is
+pending. The approved texts of 064 and 065 are not edited; this spec records what it adds
 to them. Section numbers such as "064 3.2.5" refer to those specs.
 
 ## 1. Purpose
@@ -80,7 +95,7 @@ author makes, not one Rustev may assume.
 
 ## 2. Territory
 
-Proposed `extends` edges, added at ratification as 064 and 065 did:
+The `extends` edges, added at ratification:
 
 - `crates/rustev-eval/` (004, amending): the member's parsing and check,
   the exclusion in `selection/case_regressions.rs`, the `excluded` output,
@@ -171,7 +186,7 @@ document; the generated binding types; exit codes; the Node binding's code
    value in a failed run.
 4. **Which sides.** Both: the bound of 065 3.1.3 applies per run on each
    side, and a baseline run's upstream failure leaves a case unpaired in
-   the same way (Open question 2).
+   the same way (decision 2 at approval).
 5. **Bound.** A selection reads clauses only when every run holds its
    integrity bounds (065 3.3.2), so the cases excluded on a side are at most
    the side's runs times `max_upstream_failures`, and are each within a run
@@ -322,21 +337,16 @@ cargo test -p rustev-conformance --locked
 sh crates/rustev-eval/mutation/seeds.sh "spec 074"
 ```
 
-## Open questions for the owner
+## Decisions at approval
 
-1. **Release.** 0.8.0, per 021 3.2 (3.6.4); #597 does not ask for a patch.
-   Recommended: 0.8.0, together with spec 073.
-2. **Sides.** Exclude cases excused on either side (3.2.4), or only on the
-   candidate side, as #597 words it? Recommended: both, since the
-   allowance is per run on each side and a baseline failure blocks
-   qualification the same way.
+Ratified by the owner on 2026-11-24 (A-94), with every question the draft
+left open answered as recommended:
+
+1. **Release.** 0.8.0, with spec 073 (3.6.4).
+2. **Sides.** A case is excused on either side (3.2.4).
 3. **Name and form.** `unresolved: "exclude_failed_within_integrity"` on
-   the clause, as #597 suggests, with no literal for the default (3.1.2).
-   Recommended: as written.
-4. **Requirement on the gate.** Refuse the member unless
-   `integrity.max_upstream_failures` is declared (3.1.3), rather than
-   accepting it and excluding failures without a bound. Recommended:
-   refuse, since "within integrity" has no meaning without the bound.
-5. **Strictness.** Exclude only when every gap on a side is a counted
-   upstream failure (3.2.2), so a case that also has an unknown or an
-   abstained run stays unresolved. Recommended: as written.
+   the clause, with no literal for the default (3.1.2).
+4. **Requirement on the gate.** The member is refused unless the gate
+   declares `integrity.max_upstream_failures` (3.1.3).
+5. **Strictness.** A case is excluded only when every gap on a side is a
+   counted upstream failure (3.2.2).
