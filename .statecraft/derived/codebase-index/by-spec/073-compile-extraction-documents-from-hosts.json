@@ -1,0 +1,40 @@
+{
+  "mapping": {
+    "amends": [
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "063-node-binding-parity"
+    ],
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "005-reference-backends",
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family",
+      "037-generation-steps",
+      "038-structured-extraction",
+      "063-node-binding-parity",
+      "070-extract-rules-2"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "073-compile-extraction-documents-from-hosts",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "581746d206174768ab285b3a8ffc7d359686fd9033988fd64822d8b5f8e777eb"
+}

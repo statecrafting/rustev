@@ -1,0 +1,38 @@
+{
+  "mapping": {
+    "amends": [
+      "064-selection-gate-case-regressions",
+      "065-selection-gate-run-integrity"
+    ],
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "061-host-scored-repeat-sets",
+      "064-selection-gate-case-regressions",
+      "065-selection-gate-run-integrity",
+      "072-documentation-source-gaps"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "074-case-regressions-exclude-failed-within-integrity",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "dba06696f925e2de6b1d4f5486e599af12f80137f4ce9938760deddd4bca116c"
+}
