@@ -237,8 +237,9 @@ in conflict are its refusal (3.4), never resolved by the surface.
    `profile`, `profileBases`, `variant`, `definitionVersion` or several
    definitions), it is refused before any file is read: on the CLI as a
    usage error (exit 2), on Node as `InvalidDocument`. When it is found in
-   the definition (a version 2 template with `parameters` or `variants`,
-   the test of `plan_command`), it is refused after the definition is read
+   the definition (a parameterized `rustev.definition/2` document, one
+   that declares `parameters` or `variants` under spec 034, the test of
+   `plan_command`; not a `rustev.prompt-template/1`), it is refused after the definition is read
    and before any dependency is read: on the CLI as `invalid_input` (exit
    4, 006 3.2: a supplied input the plan does not use), on Node as
    `InvalidDocument`. The core's `compile_profiled_with` takes no programs
@@ -404,7 +405,7 @@ left open answered as recommended:
    fields are a public API change, which takes the minor version before
    1.0 (3.6.4).
 2. **Instantiated compiles.** Extraction programs and templates with a
-   profile, variant or template definition are refused in this version
+   profile, a variant or a parameterized definition are refused in this version
    (3.3.4); no core entry point is added.
 3. **Names.** `--extract-rules` / `extractRules` and `--template` /
    `templates` (3.2).

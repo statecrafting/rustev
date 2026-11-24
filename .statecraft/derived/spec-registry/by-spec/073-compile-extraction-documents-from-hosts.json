@@ -114,22 +114,22 @@
       }
     ],
     "sectionDigests": {
-      "073-extraction-programs-and-prompt-templates-on-the-cli-s-and-the-node-binding-s-compile-amends-006-027-and-063": "bafc47ad1548d7dff30015e1d5708d948bd31a84c010e4e80f9edb5fb45acc38",
+      "073-extraction-programs-and-prompt-templates-on-the-cli-s-and-the-node-binding-s-compile-amends-006-027-and-063": "1daa86d9166683eb719e9a4771cab45cf6094d01afee1c41f0a38218246f4b6d",
       "1-purpose": "c90f20ee7e6fb69bc56be7b541f79660dbd4751436fcfc2ab7476119681ab50c",
       "2-1-binding-principles": "1a38bf5f0b2d7a8432cb6bd3abbba8d60f139d42da0275fc80b89a33f31b1f55",
       "2-territory": "5abba8178dfcbc9ca89e84f87965b7d8ba4be6e516ed6efaf2dc041ae19d4cc4",
       "3-1-the-inputs": "3496ddecdf61b9440300032cb0d9f9a6e0a87755edb5dd2f675a89d973fbfa3f",
       "3-2-the-surfaces": "04f5ce69f7d93b96d8002717b7885949fedfc28a9d163cf6162f9714c21f6a1b",
-      "3-3-mapping-to-the-core": "095ec84aa3cfef9553275fb7c9aa51f4293cdbf15471165e206469abe704fee2",
+      "3-3-mapping-to-the-core": "f920c1ba76ccf7e909a75e69b5a09d106796b8a735a0f5b3ebba52045f9dace4",
       "3-4-refusals": "443a39d9369bf02d18e2c543bdb468f3845f81d8e0bf78f32717ba33d6ab76f3",
       "3-5-webassembly": "6a00838d29a01722e3376c1a957d35f759e220653f8fb88bb7e8ed163a2dad40",
       "3-6-compatibility": "e5e420e106888097899f8adebc6f58b79e45336a0dd5f25e51123f54df4c6d25",
       "3-7-a-shared-rules-first-golden": "7407d4ec984878fd1938b034363ea57e5d5c5ac6b5d8efbe6d3f9368eb39a040",
-      "3-behavior": "92188ea18a57702d71790056730c8cd8dd83fcd294e91e8bf01dcef1f2d0b9b5",
+      "3-behavior": "8bfbd52d58298d34fc71a505a4de5bb717f771720e3ec850ec3cb6565b90989a",
       "4-out-of-scope": "b6572732db9e8388fb8de9b4e3f3eda6154bfd427a7bb8a2d1ed4961bf46063b",
       "5-observable-negative-cases": "a93cd18d567aed78be4a6e669164cf81e3841e6e9498aa851f3da51f9d4528ee",
       "acceptance": "a81f95523f19dbe9b94c436a4d5aaaf1b02cb1f1e1add4f94ac9c8f279585d5b",
-      "decisions-at-approval": "4c0aff7bed8f1d484459f15f5425d39ac7cae74a11a14ee68ebcb87f57e72a57",
+      "decisions-at-approval": "669fbac318c01c0a6c0b64fb7d3ecd331a399e2dc339cf7af7c39a1efd42ce2b",
       "increments": "55c5c9a211b38afd75fae1b8a9ab82d8dcacdd36b31cd4d35f2eca520e45c804",
       "verification": "bb991117a04c57839561cd7b4786964aa6497c0c0c978806e8034abc42bc3037"
     },
@@ -158,6 +158,6 @@
     "summary": "An amendment of approved specs 006 (3.4), 027 (3.3, 3.12) and 063 (3.2), for #598, ratified by the owner on 2026-11-24 (A-94) for release 0.8.0. `rustev-core` compiles a definition with supplied `rustev.extract-rules/1` and `/2` programs and `rustev.prompt-template/1` documents through `compile_with_extraction_documents`, but no host surface reaches it: the Node binding's `compile` takes descriptors, calibrations, sources and an execution policy only, and the CLI's `--rules` takes a rules backend program (spec 005), not an extraction program. A host that keeps its definitions and extraction programs in its own repository can therefore run a `fill: rules_first` plan from Node but cannot build one. This spec adds two optional, repeatable inputs, extraction programs and prompt templates, to `rustev plan check` and `rustev plan compile` (the flags `--extract-rules` and `--template`), to the Node binding's `compile`/`compileSync` option bag (`extractRules`, `templates`) and to its `command('check' | 'compile')`, each routed through `compile_with_extraction_documents`. Compile refusals keep the core's category codes on every surface, and a malformed document is refused as each surface already refuses a malformed descriptor. A call that supplies neither input calls what it calls today, so every existing plan, `PlanId`, golden and output keeps its bytes. No contract type, JSON Schema or generated binding type changes.\n",
     "title": "Extraction programs and prompt templates on the CLI's and the Node binding's compile (amends 006, 027 and 063)"
   },
-  "shardHash": "3541e1f3cc6cf9db033fcb7703009d3789503756362fab2dff6436d587aa64ae",
+  "shardHash": "0436a30db3c594dfbd95aad05a4d3816d38a842df3fb7f84b03f01e30bc20f3a",
   "specVersion": "1.11.0"
 }
