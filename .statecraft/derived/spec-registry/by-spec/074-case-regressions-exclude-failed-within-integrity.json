@@ -1,0 +1,153 @@
+{
+  "record": {
+    "amends": [
+      "064-selection-gate-case-regressions",
+      "065-selection-gate-run-integrity"
+    ],
+    "created": "2026-11-24",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "061-host-scored-repeat-sets",
+      "064-selection-gate-case-regressions",
+      "065-selection-gate-run-integrity",
+      "072-documentation-source-gaps"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "072-documentation-source-gaps",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/features/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      }
+    ],
+    "id": "074-case-regressions-exclude-failed-within-integrity",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-6-compatibility",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A `case_regressions` clause without `unresolved` is evaluated exactly as spec 064 states, and a gate without it has the same canonical bytes, identity, selection bytes, stdout and exit code as before this spec."
+      },
+      {
+        "anchor": "3-2-excluded-cases",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Under `exclude_failed_within_integrity`, a case is excluded only when it would be unresolved under 064 3.2.5 and, on each side, it is either measured with a known value in every run or every run lacking a measure for it counts it as an upstream failure under 065 3.2.2 or 3.2.4 with no unknown measure in any run; an excluded case is never compared, never counted as a regression or a non-regression, and is listed with its excused side, the baseline when both sides are excused."
+      },
+      {
+        "anchor": "3-1-the-member",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "`exclude_failed_within_integrity` is refused unless the gate declares `integrity.max_upstream_failures`, so a case is excluded only in a run that 065 has already found within its upstream-failure bound; a run in breach still voids the comparison before any clause is read."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "074-selection-gate-case-regressions-may-leave-out-cases-that-failed-within-the-integrity-allowance-amends-064-and-065": "28ffb40af86e6a586edc084c58a5889eda1674ed2674529adc3a30c5ed442b6e",
+      "1-purpose": "97464c928b567f6d8bdc090127a059a09358c0f2e14ee67d2d07786dc7163f83",
+      "2-1-binding-principles": "3a05748f44bb19a7f5ccd18af830371913adde69c45abddd84b5c40f42a9056a",
+      "2-territory": "4701f0a09344547cd000d0de85bd05b26d982854544fda7bfdc468c86eb3065c",
+      "3-1-the-member": "f46c7957b56260478df729ff86d48c53044f5291ce791da611a1552eeb7d5157",
+      "3-2-excluded-cases": "d056253852a38567e1c28c5466edf360c66ae40dc32c800acdd18748a73d8d4b",
+      "3-3-clause-result-amends-064-3-4-1": "8821af9b3ad8e54d2dd29b84ab7fdfed459e46dc4ce7390848651eb16bd52a5f",
+      "3-4-output-amends-064-3-5": "1f52a613cb81dbbe984e10018d430ab9bfe7fa71aafc1af2308e91e2b79e2c77",
+      "3-5-library-and-bindings": "e4161afb5280e611b790ff088cd4323dde67c3ce4cf081777d140748913e7d58",
+      "3-6-compatibility": "c6c77596a189b02b7b658b194c14726922ea95d01096bf4baace8cfbfc9d5de5",
+      "3-behavior": "5b3bb2fe40435960943b24de6dcf4a4d36155e4eb0b181410f1cdf4480078498",
+      "4-out-of-scope": "18ea7a3378a88ffd630e30ecd6428c23034e7b25987a37ef210c46a0ba2ac8a6",
+      "5-observable-negative-cases": "aa14382ad8331a41d3c220e38e50b532c18c9f8a4bf64c6f9825c2998d917dfc",
+      "acceptance": "47650cae98819db2df22511c7879e4726b8f04a3f749cdda8d0290088855a650",
+      "decisions-at-approval": "0513a1fe45a88c3dae633ee9ea6c76a1c7115ab5aff93c5a3ecb3a8383de2c2a",
+      "increments": "9d1fea0410747263082bd649733b491fe7038a8be9769b0f2a81b9af0064e1c3",
+      "verification": "197069bf4da7f9b8d54b1f20d06d37dbf201eb889fa21f782f75d478043e9610"
+    },
+    "sectionHeadings": [
+      "074: Selection gate: case regressions may leave out cases that failed within the integrity allowance (amends 064 and 065)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 The member",
+      "3.2 Excluded cases",
+      "3.3 Clause result (amends 064 3.4.1)",
+      "3.4 Output (amends 064 3.5)",
+      "3.5 Library and bindings",
+      "3.6 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Increments",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/074-case-regressions-exclude-failed-within-integrity/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 064 (3.1, 3.2.5, 3.5, 3.6) and 065 (3.3.4), for #597, ratified by the owner on 2026-11-24 (A-94) for release 0.8.0. A selection gate that declares both a spec 065 `integrity` allowance for upstream failures and a spec 064 `case_regressions` clause can never qualify a candidate that uses the allowance: a case that failed upstream has no measure on that side, so 064 makes it `unpaired` or `partial`, the clause is unknown unless it already fails, and the candidate ends `unknown` (exit 12) or `rejected`. This spec adds an opt-in member to the clause, `unresolved: \"exclude_failed_within_integrity\"`, allowed only when the gate declares `integrity.max_upstream_failures`. With it, a case that would be unresolved only because of upstream failures that 065 counts is left out of the clause and counted as `excluded`, never compared and never a regression or a non-regression; every other unresolved case keeps 064's meaning. Without the member, every gate, selection, stdout and exit code keeps its bytes.\n",
+    "title": "Selection gate: case regressions may leave out cases that failed within the integrity allowance (amends 064 and 065)"
+  },
+  "shardHash": "8798f77ea37b7150930232d742b7def98986f6c91fd09685c0032ed0c5b51d37",
+  "specVersion": "1.11.0"
+}

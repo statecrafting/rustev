@@ -430,3 +430,16 @@ an ignore entry in the workspace `deny.toml` (A-91, #583), with a reason
 and a revisit date of 2027-02-05; the release family's policy is
 unchanged, and no release-set crate reaches the crate. The entry is
 removed when a `hiqlite-patched` on `rusqlite` 0.41 can be adopted.
+
+## Supply-chain advisory record (2026-11-24)
+
+Four advisories published after 2026-11-11 made the `supply-chain` job
+fail on every pull request. RUSTSEC-2026-0592 (`url`) and
+RUSTSEC-2026-0486 (`rustix`) are fixed by `url` 2.5.9 and `rustix` 1.1.6
+(#600). RUSTSEC-2026-0543 (`chrono`) and RUSTSEC-2026-0555 (`chrono-tz`)
+are unmaintained notices with no safe upgrade; both reach only
+`rustev-aicortex` and `rustev-rahi`, through `aicortex-claims`,
+`hiqlite-patched`, `openraft`, `cron` and `rusqlite`. The owner accepted
+them as ignore entries in the workspace `deny.toml` (A-93, #600), with a
+reason and a revisit date of 2027-02-05; the release family's policy is
+unchanged, and no release-set crate reaches either crate.
