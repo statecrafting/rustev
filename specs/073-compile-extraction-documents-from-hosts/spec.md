@@ -183,6 +183,12 @@ in conflict are its refusal (3.4), never resolved by the surface.
    repeatable flags `--extract-rules F` and `--template F`. The usage text
    lists them beside `--rules` with one line saying that `--rules` takes a
    rules backend program and `--extract-rules` an extraction program.
+   **File access (amends 006 3.3.1 and 3.3.2).** Extraction programs are
+   read under `DESCRIPTOR_V1` and templates under `DEFINITION_V1` (3.1),
+   with 006 3.3.1's bounded reads. One command reads at most 4 096
+   `--extract-rules` and 4 096 `--template` files, as for `--descriptor`;
+   beyond that it stops with `io_error` before reading any file, and these
+   files count toward 006 3.3.2's 256 MiB.
 2. **Node, option bag (amends 027 3.3 and 063 3.2).** `compile` and
    `compileSync` gain two optional fields (027 3.3: "option bags may gain
    optional fields by later specs"):
@@ -331,6 +337,7 @@ Extraction programs and templates on instantiated or profiled compiles
 | A `vocabulary_after` field read by a hard gate | Category 14 `uncorroborated_hint` on both surfaces. |
 | The shared rules-first golden through CLI, Node and Rust | Byte-identical plan and equal `PlanId`. |
 | `--rules` given an extraction program | Unchanged: `invalid_input` (exit 4), the rules backend refuses it. |
+| 4 097 `--extract-rules` or `--template` files | `io_error` (exit 3) naming the flag, before any file is read. |
 
 ## Increments
 
@@ -397,3 +404,7 @@ left open answered as recommended:
    `templates` (3.2).
 4. **WebAssembly.** Unchanged (3.5), as 063 3.12 held.
 5. **One spec per issue.** This spec covers #598; #597 is spec 074.
+
+Added before merge, under the owner's approval of 2026-11-24 (A-94): the
+CLI file-count caps of 3.2.1, which 006 3.3.2 requires for every flag that
+names files and which the draft omitted. They follow `--descriptor`'s cap.
