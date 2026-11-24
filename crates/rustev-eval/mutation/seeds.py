@@ -43,7 +43,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061", "spec 064", "spec 065", "spec 066")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061", "spec 064", "spec 065", "spec 066", "spec 074")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -896,6 +896,50 @@ SEEDS += [
         E + "integrity.rs",
         '                    | "abstention:deadline_exceeded"',
         '                    | "abstention:deadline_exceeded" | "abstention:budget_exhausted"',
+        EVAL,
+    ),
+]
+
+# Spec 074's acceptance seeds (`seeds.sh "spec 074"`).
+SEEDS += [
+    (
+        "spec 074",
+        "the member applied when not declared",
+        E + "selection/case_regressions.rs",
+        "excluded: limit.unresolved.map(|_| CaseList::new()),",
+        "excluded: Some(CaseList::new()),",
+        EVAL,
+    ),
+    (
+        "spec 074",
+        "an excluded case counted as a compared non-regression",
+        E + "selection/case_regressions.rs",
+        "                if let Some(excluded) = cases.excluded.as_mut() {",
+        "                cases.compared += 1;\n                if let Some(excluded) = cases.excluded.as_mut() {",
+        EVAL,
+    ),
+    (
+        "spec 074",
+        "a case with an unknown run measure excluded",
+        E + "selection/case_regressions.rs",
+        "    matches!(case_value(&one, 0), CaseValue::Known(_))",
+        "    let _ = case_value(&one, 0);\n    true",
+        EVAL,
+    ),
+    (
+        "spec 074",
+        "a case missing for a reason other than an upstream failure excluded",
+        E + "selection/case_regressions.rs",
+        ".all(|(r, failed)| r.is_some() || failed.contains(case))",
+        ".all(|(r, failed)| r.is_some() || failed.contains(case) || failed.is_empty())",
+        EVAL,
+    ),
+    (
+        "spec 074",
+        "a case excused on both sides names the candidate",
+        E + "selection/case_regressions.rs",
+        "                let side = if excused(&bm, i, &case.case, &b.upstream) {\n                    \"baseline\"",
+        "                let side = if excused(&bm, i, &case.case, &b.upstream) && false {\n                    \"baseline\"",
         EVAL,
     ),
 ]

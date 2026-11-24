@@ -17,7 +17,9 @@ use crate::repeat::{
 };
 
 mod case_regressions;
-pub use case_regressions::{CaseList, CaseResults, Regression, UnresolvedCase, stdout_candidates};
+pub use case_regressions::{
+    CaseList, CaseResults, ExcludedCase, Regression, UnresolvedCase, stdout_candidates,
+};
 
 pub const SELECTION_GATE: &str = "rustev.selection-gate/1";
 pub const SELECTION: &str = "rustev.selection/1";
@@ -79,6 +81,19 @@ pub enum BaselineTarget {
 pub struct CaseRegressionLimit {
     pub by: AbsoluteDrop,
     pub at_most: u64,
+    /// Spec 074: the opt-in that leaves out cases unresolved only because
+    /// of upstream failures 065 counts. Absent is 064's meaning; there is no
+    /// literal for the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unresolved: Option<UnresolvedCases>,
+}
+/// Spec 074, 3.1: how a `case_regressions` clause treats unresolved cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UnresolvedCases {
+    /// Exclude a case whose every gap on a side is a counted upstream
+    /// failure (spec 074, 3.2); requires `integrity.max_upstream_failures`.
+    ExcludeFailedWithinIntegrity,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -167,6 +182,16 @@ impl SelectionGate {
                         "case_regressions needs positive by.absolute and at_most in [0, 1000000]"
                             .into(),
                     );
+                }
+                // Spec 074, 3.1.3: "within integrity" needs the bound.
+                if limit.unresolved.is_some()
+                    && self
+                        .integrity
+                        .as_ref()
+                        .and_then(|i| i.max_upstream_failures)
+                        .is_none()
+                {
+                    return Err("exclude-failed-needs-integrity".into());
                 }
             }
             if let MetricClause::NotWorse {
@@ -415,6 +440,12 @@ pub fn evaluate_selection(
                 .iter()
                 .map(|r| r.cases)
                 .collect(),
+            upstream: baseline_evidence
+                .inputs
+                .runs
+                .iter()
+                .map(|r| crate::integrity::evaluated_upstream_cases(r.evaluated))
+                .collect(),
         };
         let cand_side = Side {
             cohorts: &c.evidence.report.cohorts,
@@ -423,6 +454,13 @@ pub fn evaluate_selection(
             opaque: &|m: &str| opaque(&c.evidence, m),
             host: false,
             cases: c.evidence.inputs.runs.iter().map(|r| r.cases).collect(),
+            upstream: c
+                .evidence
+                .inputs
+                .runs
+                .iter()
+                .map(|r| crate::integrity::evaluated_upstream_cases(r.evaluated))
+                .collect(),
         };
         let (verdict, clauses) = judge(
             gate,
@@ -467,6 +505,9 @@ pub(crate) struct Side<'a> {
     pub opaque: &'a dyn Fn(&str) -> bool,
     pub host: bool,
     pub cases: Vec<&'a crate::eval_cases::EvalCases>,
+    /// Per run, in run order, the cases 065 counts as upstream failures
+    /// (spec 074, 3.2.1).
+    pub upstream: Vec<BTreeSet<String>>,
 }
 
 /// A candidate's clause results after its preconditions and coverage

@@ -12,6 +12,18 @@ pub struct CaseResults {
     pub unmeasured: u64,
     pub regressions: CaseList<Regression>,
     pub unresolved: CaseList<UnresolvedCase>,
+    /// Spec 074, 3.4.1: written exactly when the clause declares
+    /// `unresolved: "exclude_failed_within_integrity"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excluded: Option<CaseList<ExcludedCase>>,
+}
+/// A case left out under spec 074, with its excused side (the baseline when
+/// both are excused).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExcludedCase {
+    pub case: String,
+    pub side: String,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -95,7 +107,12 @@ pub fn stdout_candidates<T: Serialize>(gate: &SelectionGate, candidates: &T) -> 
                         .take(10)
                         .map(|r| serde_json::json!({"case":r["case"], "drop":r["drop"]}))
                         .collect();
-                    entry["cases"] = serde_json::json!({"regressions":cases["regressions"]["total"], "at_most":at_most, "unresolved":cases["unresolved"]["total"], "first":first});
+                    let mut summary = serde_json::json!({"regressions":cases["regressions"]["total"], "at_most":at_most, "unresolved":cases["unresolved"]["total"], "first":first});
+                    // Spec 074, 3.4.3: only when the clause declares the member.
+                    if let Some(excluded) = cases.get("excluded") {
+                        summary["excluded"] = excluded["total"].clone();
+                    }
+                    entry["cases"] = summary;
                 }
             }
         }
@@ -131,6 +148,34 @@ fn case_value(m: &MetricCases, index: usize) -> CaseValue {
         Some(v) if v.is_finite() => CaseValue::Known(v),
         _ => CaseValue::Unknown,
     }
+}
+
+/// Spec 074, 3.2.2: whether a side's gaps for case `index` are all counted
+/// upstream failures. At least one run lacks a measure, every run lacking
+/// one counts the case as an upstream failure, and the runs that hold a
+/// measure give a known value (no `unknown` measure, no zero denominator).
+fn excused(m: &MetricCases, index: usize, case: &str, upstream: &[BTreeSet<String>]) -> bool {
+    let runs = &m.cases[index];
+    if runs.iter().all(Option::is_some) || upstream.len() != runs.len() {
+        return false;
+    }
+    if !runs
+        .iter()
+        .zip(upstream)
+        .all(|(r, failed)| r.is_some() || failed.contains(case))
+    {
+        return false;
+    }
+    let present: Vec<_> = runs.iter().filter(|r| r.is_some()).cloned().collect();
+    if present.is_empty() {
+        return true;
+    }
+    let one = MetricCases {
+        name: m.name.clone(),
+        form: m.form.clone(),
+        cases: vec![present],
+    };
+    matches!(case_value(&one, 0), CaseValue::Known(_))
 }
 
 /// Positive exact difference, written as a plain decimal without trailing zeros.
@@ -248,6 +293,7 @@ pub(super) fn evaluate(
         unmeasured: 0,
         regressions: CaseList::new(),
         unresolved: CaseList::new(),
+        excluded: limit.unresolved.map(|_| CaseList::new()),
     };
     for (i, case) in baseline.cases.iter().enumerate() {
         let (bv, cv) = (case_value(&bm, i), case_value(&cm, i));
@@ -271,6 +317,27 @@ pub(super) fn evaluate(
                         baseline: *bv,
                         candidate: *cv,
                         drop: drop_string(high, low),
+                    });
+                }
+            }
+            _ if cases.excluded.is_some() && {
+                // Spec 074, 3.2.3: each side clean or excused, at least one excused.
+                let be = excused(&bm, i, &case.case, &b.upstream);
+                let ce = excused(&cm, i, &case.case, &c.upstream);
+                (be || ce)
+                    && (be || matches!(bv, CaseValue::Known(_)))
+                    && (ce || matches!(cv, CaseValue::Known(_)))
+            } =>
+            {
+                let side = if excused(&bm, i, &case.case, &b.upstream) {
+                    "baseline"
+                } else {
+                    "candidate"
+                };
+                if let Some(excluded) = cases.excluded.as_mut() {
+                    excluded.push(ExcludedCase {
+                        case: case.case.clone(),
+                        side: side.into(),
                     });
                 }
             }
@@ -343,13 +410,26 @@ mod tests {
         host: bool,
         at_most: u64,
     ) -> ClauseResult {
-        let side = |cases| Side {
+        evaluate_with(name, (b, &[]), (c, &[]), host, at_most, None)
+    }
+    /// `evaluate_docs` with each side's upstream-failure sets and the
+    /// spec 074 member.
+    fn evaluate_with(
+        name: &str,
+        (b, bu): (&[EvalCases], &[BTreeSet<String>]),
+        (c, cu): (&[EvalCases], &[BTreeSet<String>]),
+        host: bool,
+        at_most: u64,
+        unresolved: Option<UnresolvedCases>,
+    ) -> ClauseResult {
+        let side = |cases, upstream: &[BTreeSet<String>]| Side {
             cohorts: &[],
             split_role: SplitRole::Validation,
             held_out: None,
             opaque: &|_| false,
             host,
             cases,
+            upstream: upstream.to_vec(),
         };
         evaluate(
             "require[0]".into(),
@@ -359,11 +439,169 @@ mod tests {
                     absolute: Decimal::parse("0.1").unwrap(),
                 },
                 at_most,
+                unresolved,
             },
             Direction::HigherIsBetter,
-            &side(b.iter().collect()),
-            &side(c.iter().collect()),
+            &side(b.iter().collect(), bu),
+            &side(c.iter().collect(), cu),
         )
+    }
+    /// Per run, the named cases as upstream failures.
+    fn failed(runs: &[&[usize]]) -> Vec<BTreeSet<String>> {
+        runs.iter()
+            .map(|r| r.iter().map(|i| format!("case-{i}")).collect())
+            .collect()
+    }
+    const EXCLUDE: Option<UnresolvedCases> = Some(UnresolvedCases::ExcludeFailedWithinIntegrity);
+
+    #[test]
+    fn spec_074_excludes_only_cases_whose_every_gap_is_a_counted_upstream_failure() {
+        let m = "mean_log_loss";
+        let known = vec![mean(0.5); 3];
+        let unknown = Some(CaseMeasure::Unknown {
+            reason: "missing".into(),
+        });
+        // (baseline runs, baseline failed, candidate runs, candidate failed,
+        //  expected: Ok(side) excluded or Err(reason) unresolved)
+        type Row = (
+            Vec<Option<CaseMeasure>>,
+            Vec<&'static [usize]>,
+            Vec<Option<CaseMeasure>>,
+            Vec<&'static [usize]>,
+            Result<&'static str, &'static str>,
+        );
+        let none: &[usize] = &[];
+        let one: &[usize] = &[1];
+        let rows: Vec<Row> = vec![
+            // Unpaired: the candidate failed in every run.
+            (
+                known.clone(),
+                vec![none; 3],
+                vec![None; 3],
+                vec![one; 3],
+                Ok("candidate"),
+            ),
+            // Partial: failed in 1 of 3 runs, measured in the others.
+            (
+                known.clone(),
+                vec![none; 3],
+                vec![mean(0.5), None, mean(0.5)],
+                vec![none, one, none],
+                Ok("candidate"),
+            ),
+            // Failed in one run and `unknown` in another: not excluded (064
+            // names it `partial`, as any case missing from a run).
+            (
+                known.clone(),
+                vec![none; 3],
+                vec![mean(0.5), None, unknown.clone()],
+                vec![none, one, none],
+                Err("partial"),
+            ),
+            // Missing in one run with no upstream failure: not excluded.
+            (
+                known.clone(),
+                vec![none; 3],
+                vec![mean(0.5), None, mean(0.5)],
+                vec![none; 3],
+                Err("partial"),
+            ),
+            // Unmeasured on the baseline with no failure: the baseline is other.
+            (
+                vec![None; 3],
+                vec![none; 3],
+                vec![mean(0.5), None, mean(0.5)],
+                vec![none, one, none],
+                Err("partial"),
+            ),
+            // The baseline failed, the candidate measured: the baseline side.
+            (
+                vec![mean(0.5), None, mean(0.5)],
+                vec![none, one, none],
+                known.clone(),
+                vec![none; 3],
+                Ok("baseline"),
+            ),
+            // Partial by failure on both sides names the baseline.
+            (
+                vec![None, mean(0.5), mean(0.5)],
+                vec![one, none, none],
+                vec![mean(0.5), None, mean(0.5)],
+                vec![none, one, none],
+                Ok("baseline"),
+            ),
+        ];
+        for (i, (bv, bf, cv, cf, expected)) in rows.into_iter().enumerate() {
+            let b = docs(m, &[known.clone(), bv]);
+            let c = docs(m, &[known.clone(), cv]);
+            let (bu, cu) = (failed(&bf), failed(&cf));
+            let r = evaluate_with(m, (&b, &bu), (&c, &cu), true, 0, EXCLUDE);
+            let cs = r.cases.clone().unwrap().unwrap();
+            let excluded = cs.excluded.clone().expect("written when declared");
+            match expected {
+                Ok(side) => {
+                    assert!(
+                        matches!(r.result, ClauseOutcome::Pass { .. }),
+                        "row {i}: {:?}",
+                        r.result
+                    );
+                    assert_eq!((excluded.total, cs.unresolved.total), (1, 0), "row {i}");
+                    assert_eq!(
+                        cs.compared, 1,
+                        "row {i}: an excluded case is never compared"
+                    );
+                    assert_eq!(excluded.list[0].case, "case-1");
+                    assert_eq!(excluded.list[0].side, side, "row {i}");
+                }
+                Err(reason) => {
+                    assert_eq!((excluded.total, cs.unresolved.total), (0, 1), "row {i}");
+                    assert_eq!(cs.unresolved.list[0].reason, reason, "row {i}");
+                }
+            }
+            // Without the member: 064's result, unchanged, and no `excluded`.
+            let r = evaluate_with(m, (&b, &bu), (&c, &cu), true, 0, None);
+            let cs = r.cases.unwrap().unwrap();
+            assert_eq!((cs.unresolved.total, cs.excluded), (1, None), "row {i}");
+        }
+    }
+
+    #[test]
+    fn spec_074_never_removes_a_compared_case_and_a_definite_failure_still_fails() {
+        let m = "mean_log_loss";
+        // Measured in every run although counted as an upstream failure (a
+        // host count ratio of 0): compared, and here a regression.
+        let b = docs(m, &[vec![mean(0.5); 3], vec![mean(0.5); 3]]);
+        let c = docs(m, &[vec![mean(0.5); 3], vec![mean(0.0); 3]]);
+        let cu = failed(&[&[1], &[], &[]]);
+        let r = evaluate_with(m, (&b, &[]), (&c, &cu), true, 0, EXCLUDE);
+        let cs = r.cases.unwrap().unwrap();
+        assert_eq!((cs.compared, cs.regressions.total), (2, 1));
+        assert_eq!(cs.excluded.unwrap().total, 0);
+        assert!(matches!(r.result, ClauseOutcome::Fail { .. }));
+        // An excluded case beside `at_most + 1` regressions: still fails.
+        let b = docs(m, &[vec![mean(0.5)], vec![mean(0.5)]]);
+        let c = docs(m, &[vec![mean(0.0)], vec![None]]);
+        let r = evaluate_with(m, (&b, &[]), (&c, &failed(&[&[1]])), true, 0, EXCLUDE);
+        let cs = r.cases.unwrap().unwrap();
+        assert_eq!((cs.regressions.total, cs.excluded.unwrap().total), (1, 1));
+        assert!(matches!(r.result, ClauseOutcome::Fail { .. }));
+    }
+
+    #[test]
+    fn spec_074_excluded_list_is_bounded_with_an_exact_total() {
+        let m = "mean_log_loss";
+        let n = LIST_LIMIT + 1;
+        let b = docs(m, &vec![vec![mean(0.5)]; n]);
+        let c = docs(m, &vec![vec![None]; n]);
+        let all: Vec<usize> = (0..n).collect();
+        let r = evaluate_with(m, (&b, &[]), (&c, &failed(&[&all])), true, 0, EXCLUDE);
+        let excluded = r.cases.unwrap().unwrap().excluded.unwrap();
+        assert_eq!(
+            (excluded.total, excluded.list.len()),
+            (n as u64, LIST_LIMIT)
+        );
+        assert!(excluded.truncated);
+        assert_eq!(excluded.list[0].case, "case-0");
     }
     #[test]
     fn case_value_is_bit_identical_to_one_case_pool_for_both_forms_and_run_counts() {

@@ -490,6 +490,12 @@ pub fn evaluate_selection(
         opaque: &|m: &str| base_opaque.iter().any(|x| x == m),
         host: true,
         cases: base_cases.iter().collect(),
+        upstream: base
+            .inputs
+            .runs
+            .iter()
+            .map(crate::integrity::host_upstream_cases)
+            .collect(),
     };
     let mut decisions = vec![];
     let mut ranks = vec![];
@@ -550,6 +556,12 @@ pub fn evaluate_selection(
             opaque: &|m: &str| opaque.iter().any(|x| x == m),
             host: true,
             cases: case_docs.iter().collect(),
+            upstream: e
+                .inputs
+                .runs
+                .iter()
+                .map(crate::integrity::host_upstream_cases)
+                .collect(),
         };
         let (verdict, clauses) = judge(
             gate,

@@ -681,3 +681,165 @@ fn integrity_host_missing_scores_and_maximum_invalid_are_preconditions() {
         assert!(reason.contains("host-asserted"));
     }
 }
+
+/// Spec 074: the reproduction's gate, synthetic: an upstream-failure
+/// allowance beside a `case_regressions` clause and a `not_worse_than`
+/// clause on the same metric.
+fn allowance_gate(exclude: bool) -> Value {
+    let mut limit = json!({"by":{"absolute":"0.15"},"at_most":2});
+    if exclude {
+        limit["unresolved"] = json!("exclude_failed_within_integrity");
+    }
+    json!({
+        "schema":"rustev.selection-gate/1", "gate":"upstream-allowance", "per":"variant",
+        "metrics":{"rubric/brevity":"higher_is_better"},
+        "min_comparable_coverage":"0", "min_labeled_coverage":"0",
+        "integrity":{"max_upstream_failures":2},
+        "require":[
+            {"metric":"rubric/brevity","case_regressions":limit},
+            {"metric":"rubric/brevity","not_worse_than":"baseline","within":{"absolute":"0.5"}}
+        ],
+        "rank_by":[]
+    })
+}
+
+fn regressions_entry(s: &HostSelection) -> rustev_eval::selection::CaseResults {
+    s.candidates[0]
+        .clauses
+        .iter()
+        .find(|r| r.clause == "require[0]")
+        .unwrap()
+        .cases
+        .clone()
+        .unwrap()
+        .unwrap()
+}
+
+#[test]
+fn spec_074_the_reproduction_is_unknown_by_default_and_qualifies_with_the_opt_in() {
+    // One run per side, the same scores; case c1 failed upstream in the
+    // candidate (the fixture's c6 fails in every run of both sides).
+    let (c, rc) = (config(), repeat_config());
+    let base = Set::new(&c, &rc, &[RunSpec::new(0)]);
+    let mut cand = RunSpec::new(0);
+    cand.flow_version = "v2".into();
+    cand.extra_failed.push("c1");
+    let cand = Set::new(&c, &rc, &[cand]);
+
+    let s = select(&gate(&allowance_gate(false)), &base, &[("cand", &cand)]);
+    assert_eq!(s.exit_code(), 12);
+    let cases = regressions_entry(&s);
+    assert_eq!(cases.unresolved.list[0].case, "c1");
+    assert_eq!(cases.unresolved.list[0].reason, "unpaired");
+    assert_eq!(cases.unresolved.list[0].side, "candidate");
+    assert_eq!(cases.excluded, None);
+    // Integrity held and the `not_worse_than` clause passed.
+    let nw = s.candidates[0]
+        .clauses
+        .iter()
+        .find(|r| r.clause == "require[1]")
+        .unwrap();
+    assert!(
+        matches!(nw.result, ClauseOutcome::Pass { .. }),
+        "{:?}",
+        nw.result
+    );
+
+    let s = select(&gate(&allowance_gate(true)), &base, &[("cand", &cand)]);
+    assert_eq!(s.exit_code(), 0, "{}", unknown_or(&s));
+    assert_eq!(verdict(&s, "cand"), &Verdict::Qualifies);
+    let cases = regressions_entry(&s);
+    let excluded = cases.excluded.unwrap();
+    assert_eq!((excluded.total, cases.unresolved.total), (1, 0));
+    assert_eq!(
+        (
+            excluded.list[0].case.as_str(),
+            excluded.list[0].side.as_str()
+        ),
+        ("c1", "candidate")
+    );
+}
+
+fn unknown_or(s: &HostSelection) -> String {
+    match &s.candidates[0].verdict {
+        Verdict::Unknown { .. } => unknown_reason(s, &s.candidates[0].name),
+        v => format!("{v:?}"),
+    }
+}
+
+#[test]
+fn spec_074_three_runs_on_either_side_and_a_void_run() {
+    let (c, rc) = (config(), repeat_config());
+    let g = gate(&allowance_gate(true));
+    let base = Set::new(&c, &rc, &base_specs());
+    // Failed in 1 of 3 candidate runs: excluded, never computed over two runs.
+    let mut specs = candidate(|_| {});
+    specs[1].extra_failed.push("c1");
+    let partial = Set::new(&c, &rc, &specs);
+    let s = select(&g, &base, &[("partial", &partial)]);
+    let cases = regressions_entry(&s);
+    assert_eq!(cases.excluded.unwrap().list[0].side, "candidate");
+    assert_eq!(cases.unresolved.total, 0);
+    // A baseline case failed in one run, the candidate measured: the baseline side.
+    let mut bspecs = base_specs();
+    bspecs[0].extra_failed.push("c2");
+    let base2 = Set::new(&c, &rc, &bspecs);
+    let s = select(
+        &g,
+        &base2,
+        &[("same", &Set::new(&c, &rc, &candidate(|_| {})))],
+    );
+    let cases = regressions_entry(&s);
+    let excluded = cases.excluded.unwrap();
+    assert_eq!(
+        (
+            excluded.list[0].case.as_str(),
+            excluded.list[0].side.as_str()
+        ),
+        ("c2", "baseline")
+    );
+    // Beyond the allowance the run is void before any clause (065).
+    let void = Set::new(&c, &rc, &candidate(|s| s.extra_failed.extend(["c1", "c2"])));
+    let s = select(&g, &base, &[("void", &void)]);
+    assert_eq!(s.exit_code(), 12);
+    // Void before any case is read: `cases` is null (064 3.5.2).
+    assert_eq!(regressions_entry_opt(&s), Some(None));
+}
+
+fn regressions_entry_opt(s: &HostSelection) -> Option<Option<rustev_eval::selection::CaseResults>> {
+    s.candidates[0]
+        .clauses
+        .iter()
+        .find(|r| r.clause == "require[0]")
+        .unwrap()
+        .cases
+        .clone()
+}
+
+#[test]
+fn spec_074_member_refusals() {
+    let refused = |v: Value| {
+        let bytes = serde_json::to_vec(&v).unwrap();
+        match SelectionGate::parse(&bytes) {
+            Err(e) => e.to_string(),
+            Ok(g) => g.check().unwrap_err(),
+        }
+    };
+    let mut g = allowance_gate(true);
+    g.as_object_mut().unwrap().remove("integrity");
+    assert!(refused(g).contains("exclude-failed-needs-integrity"));
+    let mut g = allowance_gate(true);
+    g["integrity"] = json!({"max_invalid":0});
+    assert!(refused(g).contains("exclude-failed-needs-integrity"));
+    let mut g = allowance_gate(true);
+    g["require"][0]["case_regressions"]["unresolved"] = json!("strict");
+    assert!(!refused(g).is_empty());
+    // A gate without the member keeps its bytes and identity (I-1).
+    let plain = allowance_gate(false);
+    let parsed = gate(&plain);
+    assert!(
+        !String::from_utf8(parsed.canonical().unwrap())
+            .unwrap()
+            .contains("unresolved")
+    );
+}

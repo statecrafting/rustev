@@ -66,6 +66,35 @@ pub struct IntegrityCounts {
     pub host_asserted: bool,
 }
 
+/// The cases of a Rustev-evaluated run that 3.2.2 counts as upstream
+/// failures; spec 074 (3.2.1) excuses exactly these.
+pub(crate) fn evaluated_upstream_cases(run: &Evaluated) -> std::collections::BTreeSet<String> {
+    run.detail
+        .cases
+        .iter()
+        .filter(|c| {
+            matches!(
+                c.outcome.as_str(),
+                "abstention:backend_unavailable"
+                    | "abstention:invalid_backend_output"
+                    | "abstention:deadline_exceeded"
+            ) || (c.outcome == "incomparable"
+                && c.reason.as_deref() == Some("historical-runtime-failure"))
+        })
+        .map(|c| c.case.clone())
+        .collect()
+}
+
+/// The cases of a host run that 3.2.4 counts: every `failed` outcome.
+pub(crate) fn host_upstream_cases(run: &HostRunInputs<'_>) -> std::collections::BTreeSet<String> {
+    run.record
+        .cases
+        .iter()
+        .filter(|c| matches!(c.outcome, HostOutcome::Failed(_)))
+        .map(|c| c.case.clone())
+        .collect()
+}
+
 /// Read a Rustev-evaluated run's verified report and detail. A scorer without
 /// a standalone rubric count cannot be reconstructed from an agreement's
 /// joint exclusions, so its count is unestablished (065, 3.2.5).
@@ -126,20 +155,7 @@ pub fn evaluated_counts(run: &Evaluated) -> IntegrityCounts {
         }
         Ok(largest)
     })();
-    let upstream_failures = Ok(run
-        .detail
-        .cases
-        .iter()
-        .filter(|c| {
-            matches!(
-                c.outcome.as_str(),
-                "abstention:backend_unavailable"
-                    | "abstention:invalid_backend_output"
-                    | "abstention:deadline_exceeded"
-            ) || (c.outcome == "incomparable"
-                && c.reason.as_deref() == Some("historical-runtime-failure"))
-        })
-        .count() as u64);
+    let upstream_failures = Ok(evaluated_upstream_cases(run).len() as u64);
     IntegrityCounts {
         invalid,
         upstream_failures,
@@ -205,12 +221,7 @@ pub fn host_counts(config: &EvaluatorConfig, run: &HostRunInputs<'_>) -> Integri
     }));
     IntegrityCounts {
         invalid,
-        upstream_failures: Ok(run
-            .record
-            .cases
-            .iter()
-            .filter(|c| matches!(c.outcome, HostOutcome::Failed(_)))
-            .count() as u64),
+        upstream_failures: Ok(host_upstream_cases(run).len() as u64),
         sources,
         host_asserted: true,
     }

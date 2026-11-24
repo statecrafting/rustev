@@ -2,7 +2,7 @@
 id: "074-case-regressions-exclude-failed-within-integrity"
 title: "Selection gate: case regressions may leave out cases that failed within the integrity allowance (amends 064 and 065)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-24"
 summary: >
   An amendment of approved specs 064 (3.1, 3.2.5, 3.5, 3.6) and 065
@@ -67,9 +67,9 @@ obligations:
 # 074: Selection gate: case regressions may leave out cases that failed within the integrity allowance (amends 064 and 065)
 
 Approved: ratified by the owner on 2026-11-24 (A-94) for release 0.8.0,
-accepting every recommendation the draft wrote; the implementation is
-pending. The approved texts of 064 and 065 are not edited; this spec records what it adds
-to them. Section numbers such as "064 3.2.5" refer to those specs.
+accepting every recommendation the draft wrote; implemented in one
+change (see the implementation record). The approved texts of 064 and 065
+are not edited; this spec records what it adds to them. Section numbers such as "064 3.2.5" refer to those specs.
 
 ## 1. Purpose
 
@@ -272,23 +272,24 @@ regressions; changes to 065's counts or verdicts; repeating runs.
 | A candidate case missing in one run with no upstream failure (abstained) | Unresolved `partial`; not excluded. |
 | A case unmeasured on the baseline (no failure) and failed on the candidate | Unresolved; not excluded (baseline side is other). |
 | A baseline case failed upstream, candidate measured | Excluded, `side: "baseline"`. |
-| A case failed on both sides | Excluded, `side: "baseline"`. |
+| A case failed in one of three runs on each side | Excluded, `side: "baseline"`. |
+| A case failed in every run of both sides | Unmeasured on both sides, counted in `unmeasured` as today (064 3.2.5); not excluded. |
 | A host count-ratio metric whose failed case has value 0 | Compared as today; not excluded. |
 | A candidate run with `max_upstream_failures + 1` failures | Void before clauses (065); `unknown`, exit 12, never excluded. |
 | `at_most + 1` regressions among compared cases, one excluded | Clause fails; candidate `rejected`. |
 | More than 10 000 excluded cases | `excluded.list` holds the first 10 000 in manifest order, `total` the count, `truncated: true`. |
 | A gate without the member, on today's inputs | Byte-identical selection, stdout and exit code. |
 
-**The reproduction**, synthetic: a fictional evaluation gate over a host
-set (061) of 46 cases with one score metric, higher is better. The baseline
-is one host run in which every case is answered and scored. The candidate
-is one host run with the same scores, except that case `c01` is
-`{ failed: "upstream_failure" }`. The gate declares
-`integrity: { max_invalid: 0, max_upstream_failures: 2 }` and `require`
-holds a `case_regressions` clause (`by.absolute: "15"`, `at_most: 2`)
-beside `not_worse_than` clauses on the same metric. Integrity holds and
-the `not_worse_than` clauses pass in both rows above; only the clause
-changes.
+**The reproduction**, synthetic: a fictional evaluation gate over the
+shared host-set fixture of 061's tests (six cases, a score metric
+`rubric/brevity` on a 0 to 1 scale, higher is better; case `c6` fails in
+every run and `c5` abstains). The baseline is one host run. The candidate is
+one host run with the same scores, except that case `c1` is also
+`{ failed: ... }`. The gate declares `integrity: { max_upstream_failures:
+2 }` and `require` holds a `case_regressions` clause (`by.absolute:
+"0.15"`, `at_most: 2`) beside a `not_worse_than` clause on the same metric.
+Integrity holds (one and two failures) and the `not_worse_than` clause
+passes in both rows above; only the clause changes.
 
 ## Increments
 
@@ -320,9 +321,9 @@ case, the feature page, the mutation seeds, 074 in `make verify` and the
 ## Verification
 
 Declared for
-`spec-spine verify 074-case-regressions-exclude-failed-within-integrity`
-when the spec completes; 074 then joins `make verify` and CI's `selection`
-acceptance group. Every command is repository-local and deterministic over
+`spec-spine verify 074-case-regressions-exclude-failed-within-integrity`;
+074 is in `make verify` and in CI's `selection` acceptance group beside 064
+and 065. Every command is repository-local and deterministic over
 synthetic fixtures (R-04: mechanics, never a quality claim).
 
 ```verify:cli
@@ -336,6 +337,50 @@ cargo test -p rustev-conformance --locked
 # Negative control: each acceptance seed must be detected.
 sh crates/rustev-eval/mutation/seeds.sh "spec 074"
 ```
+
+## Implementation record
+
+Implemented in one change for release 0.8.0. `rustev-eval`:
+`CaseRegressionLimit` gains `unresolved: Option<UnresolvedCases>`
+(`exclude_failed_within_integrity`, written only when present), and
+`SelectionGate::check` refuses it unless the gate declares
+`integrity.max_upstream_failures` (`exclude-failed-needs-integrity`, 3.1).
+`integrity::evaluated_upstream_cases` and `host_upstream_cases` name the
+cases 065 3.2.2 and 3.2.4 count, and the counts are now their sizes, so the
+two can never disagree; each selection's `Side` carries them per run
+(3.2.1). `selection/case_regressions.rs`: a side is excused when a run lacks
+a measure, every such run counts the case, and the runs that hold one give
+a known value; an otherwise unresolved case is excluded when each side is
+known or excused and one is excused, naming the baseline when both are
+(3.2.2, 3.2.3). `CaseResults` gains `excluded`, written exactly when the
+member is declared (3.4.1), and `gate select`'s stdout summary gains
+`excluded` (3.4.3). The descriptive schemas `rustev.selection-gate-1` and
+`rustev.selection-1` regenerate (072 3.3); no other schema, binding type,
+plan or golden changes.
+
+Two corrections to section 5, found by the implementation: a case failed
+in every run of both sides is unmeasured on both sides, which 064 never
+makes unresolved, so it is counted in `unmeasured` and not excluded (the
+row "failed on both sides" now names a case failed in one of three runs on
+each side); and the reproduction runs over the shared host-set fixture
+(six cases, scores on 0 to 1) rather than 46 cases on 0 to 100, with the
+same shape and outcome. The fifth acceptance seed is "a case excused on
+both sides names the candidate": "a compared case excluded because it
+failed in some run" cannot be seeded, because a case known on both sides
+never reaches the exclusion.
+
+Evidence: the module's unit tests (each side state and section 5 row, a
+definite failure beside an excluded case, a compared failed case,
+truncation of `excluded`, and 064's result unchanged without the member);
+`crates/rustev-eval/tests/host_select.rs` (the reproduction, unknown by
+default and qualifying with the member; three-run sets on either side; a
+void run; the member's refusals; unchanged gate bytes); the `gate select`
+goldens `crates/rustev-cli/tests/golden/upstream-allowance.default.json`
+(exit 12) and `upstream-allowance.excluded.json` (exit 0), harvested as the
+conformance cases `cli/upstream-allowance.*` (surfaces `cli`, `native`);
+the feature page's rule; and the five seeds of `seeds.sh "spec 074"`, each
+detected. Every existing eval, CLI, 029, 061, 064, 065, conformance and
+plan golden is byte-identical.
 
 ## Decisions at approval
 

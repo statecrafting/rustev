@@ -1,0 +1,134 @@
+{
+  "argv": [
+    "gate",
+    "select",
+    "--selection-gate",
+    "gate.json",
+    "--baseline",
+    "baseline.json",
+    "--baseline-eval",
+    "base",
+    "--candidates",
+    "candidates",
+    "--out",
+    "selection-false.json"
+  ],
+  "command": "gate select",
+  "derived": [],
+  "exit": 12,
+  "id": "upstream-allowance.default",
+  "inputs": [
+    {
+      "name": "base/config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/config.json",
+      "sha256": "44f6a66715879b98803c15156be11cc7933b62a763c803a5a016f3deeb10aa37"
+    },
+    {
+      "name": "base/repeat-config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/repeat-config.json",
+      "sha256": "3bdfbb74f7de48097e4bf26fa2c4501b057cd42ddae6a698d6045ac3ee33a0e9"
+    },
+    {
+      "name": "base/repeat.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/repeat.json",
+      "sha256": "6ddaa1a4ada72188407d80dd12226f55dcaa6ddc0536e92e4a7678c14c4f636a"
+    },
+    {
+      "name": "base/run-0.cases.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/run-0.cases.json",
+      "sha256": "72f0123ee3110e87b5a284cf333ad69d52a82787e10731eea97ccbc2d3c777e4"
+    },
+    {
+      "name": "base/run-0.host-run.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/run-0.host-run.json",
+      "sha256": "131cf1f3d8c645e621a4adf1d2b33d579da1578ae2d951e74aa9e8d8e33bcfa1"
+    },
+    {
+      "name": "base/run-0.scores-judge.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/run-0.scores-judge.json",
+      "sha256": "9bc98effedf1a57ca7e89ae9fbd8d33d03c89be44b1f00f5b2edd7db7b6d468a"
+    },
+    {
+      "name": "base/run-0.scores-length.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/run-0.scores-length.json",
+      "sha256": "c2c06078ccfcdc64b0233af1a47eb52a6a5d81b5c85ec38ccdf469f0b91c8116"
+    },
+    {
+      "name": "base/run-0.scores-tone.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/run-0.scores-tone.json",
+      "sha256": "4ea24d42d642341d5f1415bb6d2016fd283bf0be9fa99f0861be616ebd12943e"
+    },
+    {
+      "name": "base/run-0.views.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/base/run-0.views.json",
+      "sha256": "fd0ad4dd79c037023e3547f79082d6c2f50f852fcff0930cb18962a83772829c"
+    },
+    {
+      "name": "baseline.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/baseline.json",
+      "sha256": "24bb0d6a3b8e19f01025b93faab31ae1f5c95cd55a821fd38a8275ac834eea13"
+    },
+    {
+      "name": "candidates/cand/config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/config.json",
+      "sha256": "44f6a66715879b98803c15156be11cc7933b62a763c803a5a016f3deeb10aa37"
+    },
+    {
+      "name": "candidates/cand/repeat-config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/repeat-config.json",
+      "sha256": "3bdfbb74f7de48097e4bf26fa2c4501b057cd42ddae6a698d6045ac3ee33a0e9"
+    },
+    {
+      "name": "candidates/cand/repeat.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/repeat.json",
+      "sha256": "f5726395e072f0a590b97d5af9b1eeb4008778ac7ac99c3bb1be36c14aa372ed"
+    },
+    {
+      "name": "candidates/cand/run-0.cases.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/run-0.cases.json",
+      "sha256": "2e48d352caea1224636ed339084aa1432f8f67386fd2dc7291d09a82e3f143db"
+    },
+    {
+      "name": "candidates/cand/run-0.host-run.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/run-0.host-run.json",
+      "sha256": "a4bbd876570965dd7163549350e78cb3b62cd59ae21d511a952a506c71c0fd8a"
+    },
+    {
+      "name": "candidates/cand/run-0.scores-judge.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/run-0.scores-judge.json",
+      "sha256": "303804853a59fa76f812cfa1c2f89e7f69334b75f516031f76dcfef95a6f03e7"
+    },
+    {
+      "name": "candidates/cand/run-0.scores-length.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/run-0.scores-length.json",
+      "sha256": "a17c91afad0030a140edb61daaa6a2d7133156204aa48a5093dc8502fc87d29f"
+    },
+    {
+      "name": "candidates/cand/run-0.scores-tone.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/run-0.scores-tone.json",
+      "sha256": "120c0eef615bd47d4181d93a1d10f72b08399a8cb49fdfe00368d484f7c7cf1c"
+    },
+    {
+      "name": "candidates/cand/run-0.views.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/candidates/cand/run-0.views.json",
+      "sha256": "d774b3b45ef6807b8bee46576fad782ed8bf49566d48d8a01152ab872561c6e4"
+    },
+    {
+      "name": "gate.json",
+      "path": "tools/rustev-conformance/fixtures/cli/upstream-allowance.default/gate.json",
+      "sha256": "797a2f6a0590763eecb11758034385148d8a0cabdec9d240413870fabcce43d0"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/upstream-allowance.default.json",
+      "normalize": [],
+      "sha256": "f752baafda29ba1d83363cae9f9ecf7f7caf3dc46d1532b4e960e1a902a1c616",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli",
+    "native"
+  ]
+}
