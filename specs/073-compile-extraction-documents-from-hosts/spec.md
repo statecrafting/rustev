@@ -2,7 +2,7 @@
 id: "073-compile-extraction-documents-from-hosts"
 title: "Extraction programs and prompt templates on the CLI's and the Node binding's compile (amends 006, 027 and 063)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-24"
 summary: >
   An amendment of approved specs 006 (3.4), 027 (3.3, 3.12) and 063
@@ -84,9 +84,9 @@ obligations:
 # 073: Extraction programs and prompt templates on the CLI's and the Node binding's compile (amends 006, 027 and 063)
 
 Approved: ratified by the owner on 2026-11-24 (A-94) for release 0.8.0,
-accepting every recommendation the draft wrote; the implementation is
-pending. The approved texts of 006, 027 and 063 are not edited; this spec records what it
-adds to them. Section numbers such as "063 3.2.1" refer to those specs.
+accepting every recommendation the draft wrote; implemented in two
+increments (see the implementation record). The approved texts of 006,
+027 and 063 are not edited; this spec records what it adds to them. Section numbers such as "063 3.2.1" refer to those specs.
 
 ## 1. Purpose
 
@@ -389,16 +389,18 @@ fewer (generated files excluded), in this order:
 
 ## Verification
 
-Declared for `spec-spine verify 073-compile-extraction-documents-from-hosts`
-when the spec completes; 073 then joins `make verify` and CI's
-`cli-backends` acceptance group beside 006. The Node tests and the native
-conformance runner run in `make bindings` (CI's `bindings` job).
+Declared for `spec-spine verify 073-compile-extraction-documents-from-hosts`;
+073 is in `make verify` and in CI's `cli-backends` acceptance group beside
+006. The Node tests (`integrations/rustev-node/test/extraction-documents.test.mjs`)
+and the native conformance runner run in `make bindings` (CI's `bindings`
+job).
 
 ```verify:cli
-# 3.7: the shared rules-first golden through the core.
-cargo test -p rustev-core --locked --test extraction_compile
-# 3.2 to 3.4 and section 5 through the CLI; every existing golden unchanged.
-cargo test -p rustev-cli --locked --test plan
+# 3.7: the shared rules-first golden through the core; existing extraction
+# goldens unchanged.
+cargo test -p rustev-core --locked --test rules_first_golden --test extraction_compile
+# 3.2 to 3.4 and section 5 through the CLI; every existing plan golden unchanged.
+cargo test -p rustev-cli --locked --test extraction_documents --test plan
 cargo test -p rustev-surface --locked
 # The conformance cases on the Rust runner; every other case unchanged.
 cargo test -p rustev-conformance --locked --test cli --test manifest
@@ -436,6 +438,26 @@ cargo test -p rustev-conformance --locked --test cli --test manifest
   goldens. `DiffArgs` keeps its `Copy` bundle under an allowed
   `large_enum_variant`. No contract type, schema, generated binding type,
   existing golden or existing conformance case changed.
+- **Increment 2 (Node) and closure.** `integrations/rustev-node`:
+  `compile` and `compileSync` take `extractRules` and `templates`
+  (3.2.2), routed by `profile::compile`: a concrete definition with either
+  calls `compile_with_extraction_documents`, without them exactly
+  `compile_with_sources` as before (3.3.1); a malformed document is
+  `InvalidDocument` naming `extractRules[i]` or `templates[i]` (3.4.1).
+  `command('check' | 'compile')` passes them as input names to the shared
+  `plan_command` (3.2.3). `plan` with either field, and either field with
+  `profile`, `profileBases`, `variant`, `definitionVersion` or several
+  definitions, is `InvalidDocument` before any parse, in `index.js` and in
+  the native usage checks; a template found in the definition is
+  `InvalidDocument` after it is read (3.3.4). `index.d.ts` gains the two
+  optional fields. Tests: `test/extraction-documents.test.mjs` compiles the
+  shared golden through `compile`, `compileSync` and `command('compile')`
+  to the Rust `PlanId` and plan bytes, compares `command('check')` with the
+  CLI golden, and covers section 5's Node rows. The five
+  `extraction-documents.*` conformance cases gain `native`
+  (`js/run.mjs` maps `--extract-rules` and `--template`); the WebAssembly
+  package is unchanged. 073 joins `make verify` and the `cli-backends`
+  group.
 
 ## Decisions at approval
 

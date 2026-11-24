@@ -280,6 +280,13 @@ export declare class Engine {
     /** `rustev.source/1` descriptors the plan binds (spec 063 3.5.2):
      * never taken from the engine's installed sources. */
     sources?: DocumentInput[];
+    /** `rustev.extract-rules/1` or `/2` programs the definition's extract
+     * steps name (spec 073 3.2.2); refused with `plan`, a profile or a
+     * variant. */
+    extractRules?: DocumentInput[];
+    /** `rustev.prompt-template/1` documents the definition's steps name
+     * (spec 073 3.2.2); refused with `plan`, a profile or a variant. */
+    templates?: DocumentInput[];
   }): Promise<PlanHandle>;
   /** Like `compile`, on the calling thread (blocking). */
   compileSync(args: {
@@ -296,6 +303,13 @@ export declare class Engine {
     /** `rustev.source/1` descriptors the plan binds (spec 063 3.5.2):
      * never taken from the engine's installed sources. */
     sources?: DocumentInput[];
+    /** `rustev.extract-rules/1` or `/2` programs the definition's extract
+     * steps name (spec 073 3.2.2); refused with `plan`, a profile or a
+     * variant. */
+    extractRules?: DocumentInput[];
+    /** `rustev.prompt-template/1` documents the definition's steps name
+     * (spec 073 3.2.2); refused with `plan`, a profile or a variant. */
+    templates?: DocumentInput[];
   }): PlanHandle;
   /** A pure command through the shared surface (`check`, `compile`,
    * `show`, `replay`, `eval`, `evalViews`, `gate`, `calibrateFit`,

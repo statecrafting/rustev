@@ -258,13 +258,11 @@ pub fn golden(name: &str, bytes: &[u8]) {
             );
         // Spec 063 (3.13.1) runs the parameterized cases natively too.
         let parameterized = name.starts_with("parameterized.");
-        // Spec 073: extraction programs and templates on compile reach the
-        // CLI first (increment 1); the native binding joins in increment 2,
-        // and the WebAssembly package gains nothing (3.5).
+        // Spec 073: extraction programs and templates on compile run on the
+        // CLI and the native binding; the WebAssembly package gains nothing
+        // (3.5).
         let extraction_documents = name.starts_with("extraction-documents.");
-        let mut surfaces = if extraction_documents {
-            json!(["cli"])
-        } else if repeat || parameterized {
+        let mut surfaces = if repeat || parameterized || extraction_documents {
             json!(["cli", "native"])
         } else if pure {
             json!(["cli", "native", "wasm"])
