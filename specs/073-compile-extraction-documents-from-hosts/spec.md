@@ -232,13 +232,18 @@ in conflict are its refusal (3.4), never resolved by the surface.
    generation steps; this spec claims nothing about generation beyond that
    mapping.
 4. **Instantiation is out of reach in this version.** A call that also
-   routes to instantiation (a `profile`, `profileBases`, `variant`,
-   `definitionVersion`, several definitions, or a version 2 template with
-   `parameters` or `variants`) and supplies either input is refused before
-   any document is parsed: on the CLI as a usage error (exit 2) naming the
-   flag, and on Node as `InvalidDocument` naming the field. The core's
-   `compile_profiled_with` takes no programs or templates, and this spec
-   does not add a core entry point (decision 2 at approval).
+   routes to instantiation and supplies either input is refused, naming
+   the flag or field. When the instantiation is named by the arguments (a
+   `profile`, `profileBases`, `variant`, `definitionVersion` or several
+   definitions), it is refused before any file is read: on the CLI as a
+   usage error (exit 2), on Node as `InvalidDocument`. When it is found in
+   the definition (a version 2 template with `parameters` or `variants`,
+   the test of `plan_command`), it is refused after the definition is read
+   and before any dependency is read: on the CLI as `invalid_input` (exit
+   4, 006 3.2: a supplied input the plan does not use), on Node as
+   `InvalidDocument`. The core's `compile_profiled_with` takes no programs
+   or templates, and this spec does not add a core entry point (decision 2
+   at approval).
 
 ### 3.4 Refusals
 
@@ -333,6 +338,7 @@ Extraction programs and templates on instantiated or profiled compiles
 | A program the definition does not name | Ignored; same `PlanId` as without it. |
 | Programs supplied in a different order | Same plan bytes and `PlanId`. |
 | `--extract-rules` with `--profile`, `--variant` or two `--definition` | Usage error, exit 2, before any parse. |
+| `--template` with a version 2 definition declaring `variants` | `invalid_input`, exit 4, naming `--template`, before any dependency is read. |
 | `compile({ plan, extractRules })` on Node | `InvalidDocument` naming `extractRules`, before any parse. |
 | A `vocabulary_after` field read by a hard gate | Category 14 `uncorroborated_hint` on both surfaces. |
 | The shared rules-first golden through CLI, Node and Rust | Byte-identical plan and equal `PlanId`. |
@@ -408,3 +414,7 @@ left open answered as recommended:
 Added before merge, under the owner's approval of 2026-11-24 (A-94): the
 CLI file-count caps of 3.2.1, which 006 3.3.2 requires for every flag that
 names files and which the draft omitted. They follow `--descriptor`'s cap.
+Also added before merge, under the same approval: the refusal of 3.3.4 for
+an instantiation found in the definition, which can only be detected after
+the definition is read, is `invalid_input` (exit 4) on the CLI rather than
+a usage error.
