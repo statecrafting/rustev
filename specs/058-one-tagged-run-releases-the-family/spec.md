@@ -308,9 +308,9 @@ no registry publication, no qualification. Its manifest is the run's own,
 so 053 3.1 (the `release/next` rehearsal and the hand-built manifest),
 3.2.1's `release-manifest-sha256:` line and 3.3.1's manifest input and
 `bind` job are removed. Kept: 053 3.2.2 to 3.2.5, 3.3.3, 3.3.4, 3.4 and
-3.5. Retiring candidates was rejected: traveler pins a candidate tag
-through a Cargo git dependency (053 3.5), and with one workflow a
-candidate costs the owner only a signed tag.
+3.5. Retiring candidates was rejected: a downstream consumer can pin a
+candidate tag through a Cargo git dependency (053 3.5), and with one
+workflow a candidate costs the owner only a signed tag.
 
 ### 3.8 What a human does
 

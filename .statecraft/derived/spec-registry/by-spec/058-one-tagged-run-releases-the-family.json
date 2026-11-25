@@ -80,7 +80,7 @@
       }
     ],
     "sectionDigests": {
-      "058-one-tagged-run-releases-the-family-amends-021-031-053-and-056": "812877c9e9f273d59ce1904582521c53bfe5fa0d48fed946a0932f9d6168e7b3",
+      "058-one-tagged-run-releases-the-family-amends-021-031-053-and-056": "477072b69d0c1a6d6914f17bbaa8956dd7eb6b84c4830496125e0379da4b6a5a",
       "1-1-the-motivating-case-0-2-0": "94939a1a7c5192274e8c337f145a89ecd40103e358860f6a1c6daf98b904eb2b",
       "1-2-the-model-spec-spine-s-release": "c3d479a0f70964682a836dac159fce29016ee7218e1eb712004f2d1051475e45",
       "1-purpose": "6b1418ca39229ddf1f9f6d1a615dcfa5d21ec12ec5bdc4eb9da4372a264b321a",
@@ -91,10 +91,10 @@
       "3-4-verification-and-qualification": "4fa8df2c1aac0679a52f2520bbab1c5e52c18ea2674cb74cf9f76a872ec78125",
       "3-5-failure-and-resume": "80c43874e7f35210967a5429e8a7b2cefbaf5378f670297bf0894e25b9d57a3b",
       "3-6-what-stays": "95de3b598113238dafb783da019a6982b12749de0c263b60d6c8503a033ce6b4",
-      "3-7-candidates-become-optional": "bcdafba63ca54a2074b178f2d21562851954f6229734c8aa9b73e8fa1b615289",
+      "3-7-candidates-become-optional": "e4638f02c5552bedbefe88092ff3a54f9f1b0838261305ad5e8600f739fd236a",
       "3-8-what-a-human-does": "c7af8b11ce9d93de150fc0ca5a32ac5f088172ca6213ac526e75037c5801a34d",
       "3-9-what-is-removed": "7dc6f2f27c053839e817ee4c0620eab16f503ffa380edfec2b84ee2c8cc93bc6",
-      "3-behavior": "dbaaf6f7139cd352f8111791a69b63788e0b24fff7a54c18122b1ce84bda6359",
+      "3-behavior": "bd7ce1aa9bba908d111a953882649fa243497f2a7ff6a2cd7643d8ae35017e0c",
       "4-observable-negative-cases": "6dd3e51a3c5b82b24ec69310d4a89ded1dd85d4a3cc8a7be687deb8ffb8e13bc",
       "acceptance": "5b542f1cac41653ea91b7dece56ac2a3a672f1752535575336f626a2ad6c9ef8",
       "implementation-record": "37db17d9a79fbc38da9a114a48247f5fff5e19d3916b3b33b22d52b0ee552fa3",
@@ -128,6 +128,6 @@
     "summary": "A proposed amendment of approved specs 021 (3.1, 3.8 to 3.10), 031 (3.9, 3.11, 3.12), 053 and 056 (3.3 to 3.5), modeled on spec-spine's tag-gated release. Pushing the owner's signed annotated tag `vX.Y.Z` on a commit of `main` starts one workflow run that builds every artifact once, checks reproducibility inside the run, generates and attests the manifest from what it built, publishes crates and npm packages through trusted publishing, creates and verifies the GitHub release, and ends with the fresh-consumer qualification. The rehearsal precondition, the owner-signed manifest, the second run, the signed publication instruction and its journal continuation are removed; release candidates become optional. Ratified by the owner on 2026-10-28 (A-61): the signed tag alone authorizes a release, and crates.io is published through trusted publishing.\n",
     "title": "One tagged run releases the family (amends 021, 031, 053 and 056)"
   },
-  "shardHash": "04f2e224a362385e0eda410716107a74edd0c38e420730dd90bc4d9010262e77",
+  "shardHash": "2862acf87d9f76e5c59444273558781f24c9d984be57129ebd08919cb0cb60a6",
   "specVersion": "1.11.0"
 }

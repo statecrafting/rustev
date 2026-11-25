@@ -10,8 +10,8 @@ summary: >
   release workflow exactly as a release is, and published only as a GitHub
   pre-release of this repository. A candidate never reaches crates.io, the
   npm registry or the container registry, never consumes spec 031 3.11's
-  first-release authority, and is the identity a downstream consumer such as
-  traveler (`statecrafting/tm`) pins with a Cargo git dependency. An
+  first-release authority, and is the identity a downstream consumer pins with a Cargo git
+  dependency. An
   integration rehearsal branch, `release/next`, is where each candidate
   commit is rehearsed before the owner signs it. Ratified by the owner on
   2026-10-25 (A-55).
@@ -62,9 +62,8 @@ builds from the owner's signed `vX.Y.Z` tag and, after the owner's acts of
 consumer a stable, owner-signed identity to integrate against before a
 release.
 
-Traveler (`statecrafting/tm`) is the first such consumer. Its program
-decisions consume Rustev "at signed revision" and allow no path override in
-qualification evidence. The owner chose (2026-10-25) that candidates are
+A typical consumer of this kind consumes Rustev "at signed revision" and
+allows no path override in its qualification evidence. The owner chose (2026-10-25) that candidates are
 git tags, that the candidate run is a real release-workflow run in this
 repository, and that this amendment be drafted. Registry pre-release
 versions were rejected: a crates.io or npm version is permanent and public,
@@ -158,7 +157,7 @@ not this spec's.
 
 Registry pre-release versions; any change to 031 3.11's first-release
 authority; the final `vX.Y.Z` release procedure; the container image;
-traveler's own integration and CI.
+any downstream consumer's own integration and CI.
 
 ## 5. Observable negative cases
 
