@@ -619,3 +619,77 @@ fn integrity_host_selection_stdout_marks_void_runs_and_preserves_assertions() {
         }
     }
 }
+
+/// Spec 074: the reproduction through `gate select`, synthetic. One host run
+/// per side with the same scores; the candidate's case c1 failed upstream,
+/// within `integrity.max_upstream_failures: 2`.
+#[test]
+fn spec_074_upstream_allowance_reproduction_through_gate_select() {
+    let s = Scratch::new("host-upstream-allowance");
+    imported(&s, "base", &[RunSpec::new(0)]);
+    s.rustev(&[
+        "baseline",
+        "record",
+        "--name",
+        "base",
+        "--eval",
+        "base",
+        "--now-ms",
+        "0",
+        "--out",
+        "baseline.json",
+    ])
+    .expect(0, "recorded");
+    let mut cand = RunSpec::new(0);
+    cand.flow_version = "v2".into();
+    cand.extra_failed.push("c1");
+    imported(&s, "candidates/cand", &[cand]);
+    for (exclude, code, status, golden_name) in [
+        (false, 12, "unknown", "upstream-allowance.default.json"),
+        (true, 0, "selected", "upstream-allowance.excluded.json"),
+    ] {
+        let mut limit = serde_json::json!({"by":{"absolute":"0.15"},"at_most":2});
+        if exclude {
+            limit["unresolved"] = "exclude_failed_within_integrity".into();
+        }
+        let gate = serde_json::json!({
+            "schema":"rustev.selection-gate/1","gate":"upstream-allowance","per":"variant",
+            "metrics":{"rubric/brevity":"higher_is_better"},
+            "min_comparable_coverage":"0","min_labeled_coverage":"0",
+            "integrity":{"max_upstream_failures":2},
+            "require":[
+                {"metric":"rubric/brevity","case_regressions":limit},
+                {"metric":"rubric/brevity","not_worse_than":"baseline","within":{"absolute":"0.5"}}
+            ],
+            "rank_by":[]
+        });
+        s.write("gate.json", &serde_json::to_vec(&gate).unwrap());
+        let out = format!("selection-{exclude}.json");
+        let r = select(&s, "candidates", &out);
+        let j = r.expect(code, status);
+        common::cli_golden(golden_name, &r.stdout);
+        let summary = &j["candidates"][0]["clauses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["clause"] == "require[0]")
+            .unwrap()["cases"];
+        let file: serde_json::Value = serde_json::from_slice(&s.read(&out)).unwrap();
+        let cases = &file["candidates"][0]["clauses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["clause"] == "require[0]")
+            .unwrap()["cases"];
+        if exclude {
+            assert_eq!(summary["excluded"], 1);
+            assert_eq!(summary["unresolved"], 0);
+            assert_eq!(cases["excluded"]["list"][0]["case"], "c1");
+            assert_eq!(cases["excluded"]["list"][0]["side"], "candidate");
+        } else {
+            assert!(summary.get("excluded").is_none());
+            assert!(cases.get("excluded").is_none());
+            assert_eq!(cases["unresolved"]["list"][0]["reason"], "unpaired");
+        }
+    }
+}

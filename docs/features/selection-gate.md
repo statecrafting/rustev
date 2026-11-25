@@ -8,7 +8,7 @@ summary: Decide whether candidate plans may replace a baseline, from repeated ev
 stability: stable
 concepts: [repeat-evaluation, noise-band, unresolved-outcomes]
 related: [evaluation, baselines, repeat-evaluation, host-scored-runs, calibration]
-governed_by: ["029", "061", "064", "065"]
+governed_by: ["029", "061", "064", "065", "074"]
 ---
 
 # Selection gate
@@ -38,7 +38,7 @@ choice, not the choice: Rustev never promotes a plan.
 | | |
 |---|---|
 | **Stability** | Stable |
-| **Since** | 0.1.0 · host-scored runs 0.4.1 · `case_regressions` and `integrity` 0.6.0 |
+| **Since** | 0.1.0 · host-scored runs 0.4.1 · `case_regressions` and `integrity` 0.6.0 · `unresolved` on `case_regressions` 0.8.0 |
 | **Rust** | `rustev` with feature `eval` → `rustev::eval::evaluate_selection` |
 | **CLI** | `rustev gate select` |
 | **Node** | `engine.gateSelect(inputs, args)` |
@@ -282,6 +282,17 @@ value for every comparable case (routed or not), so every case pairs.
 one side routed and the other escalated has no pair, and the rule becomes
 unknown (`sr-m04: unpaired (baseline)`) rather than pass.
 
+**Leaving out cases that failed within the integrity limit.** A case a
+backend or source failed on has no value on that side, so by default it
+also makes the rule unknown, and a gate with both `integrity` and
+`case_regressions` could never qualify a candidate that used its allowance.
+Add `"unresolved": "exclude_failed_within_integrity"` to the rule's
+`case_regressions` to leave such cases out instead: a case is excluded only
+when every gap in it is an upstream failure that `integrity` counts, and the
+gate must declare `integrity.max_upstream_failures`, which bounds how many
+there can be. Excluded cases are listed with their side; any other missing
+or unknown value still makes the rule unknown.
+
 ## Reading the result
 
 <!-- shapes: from the example's selection.json and spec 029 3.12.7; checked
@@ -329,7 +340,8 @@ or `{ "unknown": { "reason" } }`. A `case_regressions` result also carries
 `cases`: how many cases were `compared`, the `regressions` (with `case`,
 `baseline`, `candidate` and `drop`), the `unmeasured` count and the
 `unresolved` cases, each list with its `total` and whether it was
-`truncated`.
+`truncated`; with `unresolved: "exclude_failed_within_integrity"`, also the
+`excluded` cases, each with its `case` and `side`.
 
 **`ranked`** lists qualifying candidates in `rank_by` order. **`unranked`**
 lists qualifying candidates whose ranking metric is unknown, with the
@@ -376,8 +388,11 @@ const { code, out, artifacts } = await engine.gateSelect(inputs, {
   either side voids the comparison; a baseline breach voids every candidate.
   [065 I-1, I-2](../../specs/065-selection-gate-run-integrity/spec.md)
 - **A case regression is never assumed away.** A case without a value on
-  both sides makes `case_regressions` unknown, not a pass.
-  [064 I-1](../../specs/064-selection-gate-case-regressions/spec.md)
+  both sides makes `case_regressions` unknown, not a pass, unless the gate
+  opts in to leaving out cases that failed upstream within its integrity
+  limit; those are listed, never counted as a pass or a regression.
+  [064 I-1](../../specs/064-selection-gate-case-regressions/spec.md),
+  [074 I-2](../../specs/074-case-regressions-exclude-failed-within-integrity/spec.md)
 - **Historical latency and cost are not the candidate's.** A rule over them
   for an offline candidate is unknown.
   [029 R-1](../../specs/029-evaluation-repeatability/spec.md)
@@ -406,7 +421,8 @@ const { code, out, artifacts } = await engine.gateSelect(inputs, {
 <sub>Governed by specs [029](../../specs/029-evaluation-repeatability/spec.md),
 [061](../../specs/061-host-scored-repeat-sets/spec.md),
 [064](../../specs/064-selection-gate-case-regressions/spec.md),
-[065](../../specs/065-selection-gate-run-integrity/spec.md).</sub>
+[065](../../specs/065-selection-gate-run-integrity/spec.md),
+[074](../../specs/074-case-regressions-exclude-failed-within-integrity/spec.md).</sub>
 
 <!--
 ## Provenance (prototype only; not part of the published page)
@@ -427,6 +443,6 @@ const { code, out, artifacts } = await engine.gateSelect(inputs, {
 | Reading the result | Example shape | example output, 029 §3.12.7 | published schema, `rustev-eval` `tests/schemas.rs` |
 | Exit codes | Derived | CLI exit-code table | CLI golden tests |
 | From Node | Derived | `GateSelectArgs` in `index.d.ts` | typings check |
-| Guarantees and limits | Written, linked | requirements of 029, 061, 064, 065 | requirement links; freshness |
+| Guarantees and limits | Written, linked | requirements of 029, 061, 064, 065, 074 | requirement links; freshness |
 | See also, Governed by | Derived | frontmatter | link check |
 -->

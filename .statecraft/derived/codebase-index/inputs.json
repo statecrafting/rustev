@@ -37,7 +37,7 @@
       "contentHash": "ab7e41e254433296c7839ebaa51780fcf9e3b7ca8157dda0aa341b947d50a38d"
     },
     "Makefile": {
-      "contentHash": "24972100752e9f2de16e3ed216e46cc7c2323ed57fce43913dd54bf78233b27b"
+      "contentHash": "7de460500c9f6c1e8434eb55abd27f1a0fb266ef613fb7d41f98e221c8503550"
     },
     "README.md": {
       "contentHash": "a47b7e3004c0856ad1e05cb1bb9117babbfbb8b9e70951497df98dcdba09d54e"
@@ -109,7 +109,7 @@
       "contentHash": "c7df0ab376e0e837439039e52f433c68b312bea5ed89bfdd1e39a421b6ec2969"
     },
     "docs/features/selection-gate.md": {
-      "contentHash": "758699167ef1b5140b1d1728ac38a5127f0206f1916e01d71330af810c7ee526"
+      "contentHash": "0af43ccb77fd0a0b5ab3111cc83506f5dd0417eee03f257d636ac67dfd82d164"
     },
     "docs/features/selection-gate/example/expected-gate-strict.json": {
       "contentHash": "5b42edab3131df7cec90a5277ea189a24420fac2c2d20ec69cb30baaa019a5c8"
