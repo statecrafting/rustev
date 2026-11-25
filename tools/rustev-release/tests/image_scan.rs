@@ -63,8 +63,9 @@ fn the_committed_exceptions_name_owner_rows_and_cover_their_findings() {
     // 060 3.2.1: each entry names a decision row that exists, at most 90
     // days before its expiry (A-80, accept all 44 on the Debian 13 base;
     // A-82's CVE-2026-76844 in zlib1g, removed by A-95 when it matched no
-    // finding; A-95, the 27 findings of the v0.8.0 run).
-    assert_eq!(ex.exceptions.len(), 71);
+    // finding; A-95, the 27 findings of the v0.8.0 run; A-96, the 2 added the
+    // same day).
+    assert_eq!(ex.exceptions.len(), 73);
     assert_eq!(
         ex.exceptions
             .iter()
@@ -80,7 +81,11 @@ fn the_committed_exceptions_name_owner_rows_and_cover_their_findings() {
         27
     );
     for e in &ex.exceptions {
-        assert!(e.decision == "A-80" || e.decision == "A-95", "{}", e.id);
+        assert!(
+            e.decision == "A-80" || e.decision == "A-95" || e.decision == "A-96",
+            "{}",
+            e.id
+        );
         assert!(
             rows.contains_key(&e.decision),
             "{}: no row {}",
@@ -107,10 +112,10 @@ fn the_committed_exceptions_name_owner_rows_and_cover_their_findings() {
         v.iter()
             .filter(|m| m.contains("expired on 2027-02-01"))
             .count(),
-        71
+        73
     );
     // An empty scan leaves every entry unused.
-    assert_eq!(check(&ex, &rows, &[], "2026-11-25").len(), 71);
+    assert_eq!(check(&ex, &rows, &[], "2026-11-25").len(), 73);
 }
 
 #[test]
