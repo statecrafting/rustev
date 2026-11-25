@@ -995,8 +995,16 @@ function profileInputs(a) {
   const has = k => a[k] !== undefined && a[k] !== null;
   const invalid = field => { throw new classes.InvalidDocument('invalid_document', field); };
   if (has('definition') && has('definitions')) invalid('definitions with definition');
-  const withPlan = ['definitions', 'profile', 'profileBases', 'variant', 'definitionVersion'].find(has);
+  const withPlan = ['definitions', 'profile', 'profileBases', 'variant', 'definitionVersion', 'extractRules', 'templates'].find(has);
   if (has('plan') && withPlan) invalid(`plan with ${withPlan}`);
+  // Spec 073, 3.3.4: extraction programs and templates reach only a concrete
+  // definition's compile; an instantiation named here is refused before any parse.
+  const documents = ['extractRules', 'templates'].find(has);
+  if (documents) {
+    const instantiation = ['profile', 'profileBases', 'variant', 'definitionVersion'].find(has)
+      ?? (Array.isArray(a.definitions) && a.definitions.length > 1 ? 'definitions' : undefined);
+    if (instantiation) invalid(`${documents} with ${instantiation}`);
+  }
   if (!has('profile')) {
     for (const k of ['profileBases', 'definitionVersion']) if (has(k)) invalid(k);
     if (Array.isArray(a.definitions) && a.definitions.length > 1) invalid('definitions requires profile');
@@ -1011,7 +1019,7 @@ function profileInputs(a) {
   for (const k of ['definition', 'profile', 'execution']) {
     if (has(k)) { inputs[k] = bytes(a[k]); args[k] = k; }
   }
-  for (const k of ['definitions', 'profileBases', 'descriptors', 'calibrations', 'sources']) {
+  for (const k of ['definitions', 'profileBases', 'descriptors', 'calibrations', 'sources', 'extractRules', 'templates']) {
     if (has(k)) {
       if (!Array.isArray(a[k])) invalid(k);
       args[k] = a[k].map((d, i) => { const key = `${k}/${i}`; inputs[key] = bytes(d); return key; });

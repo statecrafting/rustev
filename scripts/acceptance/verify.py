@@ -52,13 +52,15 @@ ROOT = Path(__file__).resolve().parents[2]
 # 25 minutes split in two on that day's queue run (per-spec seconds:
 # cli-backends 2,200, integrations-base 2,172, integrations-core 1,611).
 # Each half is at most about 21 minutes, under 004's 20 alone plus setup.
+# 073 joins cli-backends beside 006, the CLI spec it amends (spec 073,
+# Verification).
 # 2026-11-07: cli-repeat (001 005 011 029 061 064 065) ran 33 to 43 minutes
 # on the merge queue against the job's 45-minute limit and one run was
 # cancelled while compiling; the selection specs 029, 061, 064 and 065
 # move to their own group.
 GROUPS = {
     "evaluation": "004".split(),
-    "cli-backends": "006 014 041".split(),
+    "cli-backends": "006 014 041 073".split(),
     "cli-repeat": "001 005 011".split(),
     "selection": "029 061 064 065 072".split(),
     "integrations-base": "002 010 033 038 040 042 070".split(),

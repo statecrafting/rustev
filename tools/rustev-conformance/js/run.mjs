@@ -400,6 +400,9 @@ async function nativeAdapter() {
       bundle: a.one('bundle'),
       store: a.one('store'),
     };
+    // Spec 073, 3.2.3: extraction programs and templates by input name.
+    if (a.many('extract-rules').length) args.extractRules = a.many('extract-rules');
+    if (a.many('template').length) args.templates = a.many('template');
     if (c.id.startsWith('parameterized.')) {
       delete args.definition;
       if (a.many('definition').length) args.definitions = a.many('definition');

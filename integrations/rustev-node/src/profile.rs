@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use napi::{Result, bindgen_prelude::Uint8Array};
 use rustev_contract::{
     Document, calibration::CalibrationArtifact, definition::Definition,
-    descriptor::BackendDescriptor, execution::ExecutionPolicy, limits::DEFINITION_V1,
-    source::SourceDescriptor,
+    descriptor::BackendDescriptor, execution::ExecutionPolicy, extraction_documents::ExtractRules,
+    generation::PromptTemplate, limits::DEFINITION_V1, source::SourceDescriptor,
 };
 use rustev_core::{Compiled, instantiate::ProfiledRefusal};
 use rustev_surface::{deps::DepArgs, host::Memory, plan_diff::DiffArgs, profile::ProfileArgs};
@@ -85,11 +85,26 @@ pub fn validate(name: &str, a: &Value) -> Result<()> {
                 "profileBases",
                 "variant",
                 "definitionVersion",
+                // Spec 073, 3.2.2: a compiled plan embeds its documents.
+                "extractRules",
+                "templates",
             ]
             .into_iter()
             .find(|k| present(a, k))
         {
             return Err(usage(&format!("plan with {key}")));
+        }
+        // Spec 073, 3.3.4: an instantiation named by the arguments, as the
+        // CLI's usage refusal, before any document is read.
+        if let Some(field) = ["extractRules", "templates"]
+            .into_iter()
+            .find(|k| present(a, k))
+            && let Some(key) = ["profile", "profileBases", "variant", "definitionVersion"]
+                .into_iter()
+                .find(|k| present(a, k))
+                .or((list(a, "definitions")?.len() > 1).then_some("definitions"))
+        {
+            return Err(usage(&format!("{field} with {key}")));
         }
         if !present(a, "profile") {
             for key in ["profileBases", "definitionVersion"] {
@@ -159,11 +174,15 @@ pub fn command(name: &str, inputs: BTreeMap<String, Vec<u8>>, a: &Value) -> Resu
     let descriptors = list(a, "descriptors")?;
     let rules = list(a, "rules")?;
     let calibrations = list(a, "calibrations")?;
+    // Spec 073, 3.2.3: input names, as `descriptors`.
+    let extract_rules = list(a, "extractRules")?;
+    let templates = list(a, "templates")?;
     let deps = DepArgs {
         descriptors: &descriptors,
         rules: &rules,
         calibrations: &calibrations,
-        ..Default::default()
+        extract_rules: &extract_rules,
+        templates: &templates,
     };
     let p = args(a, &ds, &bs, "profile", "variant");
     let mut hook = crate::commands::profile_rules_hook;
@@ -276,6 +295,22 @@ pub fn compile(inputs: &BTreeMap<String, Vec<u8>>, a: &Value) -> Result<Prepared
     let execution = opt(a, "execution")?
         .map(|s| ExecutionPolicy::parse(read(s)?).map_err(|e| usage(&e.to_string())))
         .transpose()?;
+    // Spec 073, 3.1 and 3.4.1: each document under its type's bound, a
+    // malformed one `InvalidDocument` naming the field and index.
+    let programs = list(a, "extractRules")?
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            ExtractRules::parse(read(s)?).map_err(|e| usage(&format!("extractRules[{i}]: {e}")))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let templates = list(a, "templates")?
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            PromptTemplate::parse(read(s)?).map_err(|e| usage(&format!("templates[{i}]: {e}")))
+        })
+        .collect::<Result<Vec<_>>>()?;
     // The test `plan_command` applies, after the bound its host read applies
     // (DEFINITION_V1.max_bytes): an oversized document is refused here, never
     // misrouted by a failed detection parse.
@@ -299,6 +334,18 @@ pub fn compile(inputs: &BTreeMap<String, Vec<u8>>, a: &Value) -> Result<Prepared
         || present(a, "definitionVersion")
         || definitions.len() != 1
     {
+        // Spec 073, 3.3.4: not on an instantiated compile in this version.
+        if let Some(field) = [
+            ("extractRules", programs.len()),
+            ("templates", templates.len()),
+        ]
+        .iter()
+        .find_map(|(f, n)| (*n > 0).then_some(*f))
+        {
+            return Err(usage(&format!(
+                "{field} is not supported with a profile, a variant or a parameterized definition (spec 073, 3.3.4)"
+            )));
+        }
         rustev_core::instantiate::compile_profiled_with(
             &definitions,
             profile,
@@ -313,13 +360,26 @@ pub fn compile(inputs: &BTreeMap<String, Vec<u8>>, a: &Value) -> Result<Prepared
         .map_err(refusal)?
     } else {
         let def = Definition::parse(definitions[0]).map_err(|e| usage(&e.to_string()))?;
-        rustev_core::compile_with_sources(
-            &def,
-            &descriptors,
-            &calibrations,
-            &sources,
-            execution.as_ref(),
-        )
+        // Spec 073, 3.3.1 and 3.3.2: exactly today's call without documents.
+        if programs.is_empty() && templates.is_empty() {
+            rustev_core::compile_with_sources(
+                &def,
+                &descriptors,
+                &calibrations,
+                &sources,
+                execution.as_ref(),
+            )
+        } else {
+            rustev_core::compile::compile_with_extraction_documents(
+                &def,
+                &descriptors,
+                &calibrations,
+                &sources,
+                execution.as_ref(),
+                &templates,
+                &programs,
+            )
+        }
         .map_err(crate::errors::refusal)?
     };
     Ok(PreparedInputs {
