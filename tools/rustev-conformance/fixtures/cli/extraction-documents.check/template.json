@@ -1,0 +1,1 @@
+{"id":"airline-confirmation","instructions":"SYNTHETIC: extract the booking confirmation code, the flight number and the departure date from a fictional airline confirmation.","params":[],"schema":"rustev.prompt-template/1","version":"1.0.0"}

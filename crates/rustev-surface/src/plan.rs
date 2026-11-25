@@ -5,6 +5,7 @@ use rustev_contract::definition::Definition;
 use rustev_contract::execution::ExecutionPolicy;
 use rustev_contract::limits::{DEFINITION_V1, DESCRIPTOR_V1, PLAN_V1};
 use rustev_contract::plan::{BoundCalibration, Plan, PlanExecution, PlanStepDetail};
+use rustev_core::compile::compile_with_extraction_documents;
 use rustev_core::compile::{Category, ShortfallReason};
 use rustev_core::{Compiled, LoadError, Refusal, compile, compile_with};
 use serde_json::{Value, json};
@@ -244,6 +245,20 @@ pub(crate) fn compile_definition_bytes(
             })?)
         }
     };
+    // Spec 073, 3.3.1: with no extraction program or template, exactly the
+    // call made before; otherwise the core's extraction-documents compile.
+    if deps.has_documents() {
+        return compile_with_extraction_documents(
+            &def,
+            &deps.descriptors,
+            &deps.calibrations,
+            &[],
+            execution.as_ref(),
+            &deps.templates,
+            &deps.programs,
+        )
+        .map_err(|r| refused(command, &r));
+    }
     match &execution {
         None => compile(&def, &deps.descriptors, &deps.calibrations),
         Some(x) => compile_with(&def, &deps.descriptors, &deps.calibrations, x),

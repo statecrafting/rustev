@@ -16,6 +16,8 @@ pub const MAX_TOTAL_BYTES: usize = 256 * 1024 * 1024;
 pub const MAX_RULES_FILES: usize = rustev_surface::host::MAX_RULES_FILES;
 pub const MAX_DESCRIPTOR_FILES: usize = rustev_surface::host::MAX_DESCRIPTOR_FILES;
 pub const MAX_CALIBRATION_FILES: usize = rustev_surface::host::MAX_CALIBRATION_FILES;
+pub const MAX_EXTRACT_RULES_FILES: usize = rustev_surface::host::MAX_EXTRACT_RULES_FILES;
+pub const MAX_TEMPLATE_FILES: usize = rustev_surface::host::MAX_TEMPLATE_FILES;
 
 pub use rustev_surface::host::{IoFail, ReadFail};
 

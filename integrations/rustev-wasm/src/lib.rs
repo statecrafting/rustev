@@ -114,6 +114,7 @@ fn deps<'a>(descriptors: &'a [String], calibrations: &'a [String]) -> DepArgs<'a
         descriptors,
         rules: &[],
         calibrations,
+        ..Default::default()
     }
 }
 

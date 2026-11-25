@@ -63,6 +63,10 @@ pub enum EntryKind {
 pub const MAX_RULES_FILES: usize = 64;
 pub const MAX_DESCRIPTOR_FILES: usize = 4096;
 pub const MAX_CALIBRATION_FILES: usize = 4096;
+/// Spec 073, 3.2.1: as `--descriptor`.
+pub const MAX_EXTRACT_RULES_FILES: usize = 4096;
+/// Spec 073, 3.2.1: as `--descriptor`.
+pub const MAX_TEMPLATE_FILES: usize = 4096;
 
 /// The host of one command.
 pub trait Host {

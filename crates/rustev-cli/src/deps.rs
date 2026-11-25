@@ -10,7 +10,10 @@ use rustev_core::seams::DecisionBackend;
 pub use rustev_surface::deps::{DepArgs, DepFail};
 
 use crate::args::Parsed;
-use crate::io::{IoFail, MAX_CALIBRATION_FILES, MAX_DESCRIPTOR_FILES, MAX_RULES_FILES, Reads};
+use crate::io::{
+    IoFail, MAX_CALIBRATION_FILES, MAX_DESCRIPTOR_FILES, MAX_EXTRACT_RULES_FILES, MAX_RULES_FILES,
+    MAX_TEMPLATE_FILES, Reads,
+};
 
 /// What the dependency flags named.
 #[derive(Default)]
@@ -27,6 +30,8 @@ pub fn args(p: &Parsed) -> DepArgs<'_> {
         descriptors: p.many("descriptor"),
         rules: p.many("rules"),
         calibrations: p.many("calibration"),
+        extract_rules: p.many("extract-rules"),
+        templates: p.many("template"),
     }
 }
 
@@ -57,7 +62,9 @@ pub fn check_counts(p: &Parsed) -> Result<(), IoFail> {
     };
     check("descriptor", MAX_DESCRIPTOR_FILES)?;
     check("rules", MAX_RULES_FILES)?;
-    check("calibration", MAX_CALIBRATION_FILES)
+    check("calibration", MAX_CALIBRATION_FILES)?;
+    check("extract-rules", MAX_EXTRACT_RULES_FILES)?;
+    check("template", MAX_TEMPLATE_FILES)
 }
 
 /// Read every dependency flag of `p`.

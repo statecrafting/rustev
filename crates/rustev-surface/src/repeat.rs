@@ -395,6 +395,7 @@ impl CandidateFiles {
             descriptors: &self.descriptors,
             rules: &self.rules,
             calibrations: &self.calibrations,
+            ..Default::default()
         }
     }
 }

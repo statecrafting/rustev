@@ -38,6 +38,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-serve/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
         "path": "scripts/acceptance/",
         "source": "spec-edge"
       },
@@ -102,6 +110,32 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-serve/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-serve/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-wasm/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "scripts/acceptance/"
           }
         ],
@@ -156,5 +190,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "0436a30db3c594dfbd95aad05a4d3816d38a842df3fb7f84b03f01e30bc20f3a"
+  "shardHash": "43894c23e8b9ffd813524d8f6152e9b21a846993905ae32b4364621ea9089473"
 }

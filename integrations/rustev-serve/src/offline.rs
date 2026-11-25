@@ -238,6 +238,7 @@ fn execute(
                 descriptors: &descriptors,
                 calibrations: &calibrations,
                 rules: &[],
+                ..Default::default()
             },
         };
         rustev_surface::eval::eval("eval", &host, args, &host, &mut |_, _| {
