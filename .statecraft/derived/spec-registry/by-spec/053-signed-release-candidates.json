@@ -50,8 +50,8 @@
       }
     ],
     "sectionDigests": {
-      "053-signed-release-candidates-published-only-as-github-pre-releases-amends-031": "215bc87559e7abe1f76eb1485e683cf2db3a852af0f0df131f1c0a91dd8dcefc",
-      "1-purpose": "934039f41fce8a3c166d25066e53a28ef32eb44da3dc1db39d5d67d52b8963f9",
+      "053-signed-release-candidates-published-only-as-github-pre-releases-amends-031": "32e97beefcd298b39fdd506409cce8729a7d3409f064ed6716c10225f9c4b7c5",
+      "1-purpose": "86dc8971eb1c2713cf54b13fa4b9907af4157901898b4a3ebb8aa25d0a5d6f60",
       "2-territory": "d9f52a8747314b5fde8e314f21ac5cef52453479145705574107755f6d377953",
       "3-1-the-integration-rehearsal-branch": "bdb8f25d4a081cca2cd13007650f7c978903ba50e71b87f22d6addd970ace236",
       "3-2-the-candidate-tag": "bfc3f1db8845f2ac606819b42c5141356cd9d8775704553fb45821e5b6465133",
@@ -59,7 +59,7 @@
       "3-4-what-a-candidate-never-does": "dcd4227bd87f9722095b3d3d5fe5d275b9ed9c4061f500cc5e20aa993ff36958",
       "3-5-consumption": "5abb9dad49cccf2f7d7acb378569abf444c9de00ec6c903062b59335401a4a06",
       "3-release-candidates": "cdaabd2a464ce3adb033f1c69265b302efbc81398007a6a1f7b41b1a1233f489",
-      "4-out-of-scope": "c0d2f53da159cbc886481fcbc38b115cd8ad84f0d2be8d05fc5f44c889d50af9",
+      "4-out-of-scope": "f675840aeee98a1f317678d2f0a20a5ae92f2ae0ca88864c921f69d301d89dd7",
       "5-observable-negative-cases": "01fc98e408fdead09ebaa5bacbc9282ce637f8ae27635f8ef9101b5b71824241",
       "acceptance": "e95aeca407e983ff63fbd24c3b6506d5f812d08982200ff55af9b7374addf47b",
       "decisions-at-approval": "e4a88a2e9e369a6cef7ba7685a9a4d48cca2f401f268e0fa22d3618d470db8cb",
@@ -85,9 +85,9 @@
     ],
     "specPath": "specs/053-signed-release-candidates/spec.md",
     "status": "approved",
-    "summary": "A narrow amendment of approved spec 031 (3.9, 3.11, 3.12). It adds a release candidate: an owner-signed annotated tag `vX.Y.Z-rc.N` on a commit of `main`, built and checked by the release workflow exactly as a release is, and published only as a GitHub pre-release of this repository. A candidate never reaches crates.io, the npm registry or the container registry, never consumes spec 031 3.11's first-release authority, and is the identity a downstream consumer such as traveler (`statecrafting/tm`) pins with a Cargo git dependency. An integration rehearsal branch, `release/next`, is where each candidate commit is rehearsed before the owner signs it. Ratified by the owner on 2026-10-25 (A-55).\n",
+    "summary": "A narrow amendment of approved spec 031 (3.9, 3.11, 3.12). It adds a release candidate: an owner-signed annotated tag `vX.Y.Z-rc.N` on a commit of `main`, built and checked by the release workflow exactly as a release is, and published only as a GitHub pre-release of this repository. A candidate never reaches crates.io, the npm registry or the container registry, never consumes spec 031 3.11's first-release authority, and is the identity a downstream consumer pins with a Cargo git dependency. An integration rehearsal branch, `release/next`, is where each candidate commit is rehearsed before the owner signs it. Ratified by the owner on 2026-10-25 (A-55).\n",
     "title": "Signed release candidates published only as GitHub pre-releases (amends 031)"
   },
-  "shardHash": "2aaa2cbc695c8b8a386897f86b9f94dc3c88eabaaf9388ca0a935ea21fdf4512",
+  "shardHash": "1c1655757b42a4633ead44a654db092b9630adeb99dc24b52b5cc29b5eb387f2",
   "specVersion": "1.11.0"
 }
