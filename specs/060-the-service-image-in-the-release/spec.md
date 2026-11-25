@@ -613,6 +613,25 @@ this release's 8 `qualification-` assets; `make code`, declared
 verification and `make gate` by this change's checks, with 060 now in
 `VERIFIED_SPECS`. Implementation is complete.
 
+**Increment 7, 2026-11-25 (3.2.1, the v0.8.0 findings).** The `v0.8.0`
+release run (45554514195) failed `image checks` on 27 findings per platform
+outside A-80's 44, 21 vulnerability ids with no fixed Debian version, and on
+A-82's CVE-2026-76844 entry, which no longer matched a finding. The owner
+accepted the 27 on 2026-11-25 (A-95). `tools/rustev-release/image-exceptions.json`
+gains 27 entries naming A-95 and expiring on 2027-02-01, like A-80's, and
+loses A-82's: 13 in `libssl3t64`, not reached because the binary's
+`DT_NEEDED` is only `libgcc_s`, `libm` and `libc`, it imports no `dlopen`,
+and its TLS is statically linked rustls over aws-lc; 6 in `libc6`, in iconv
+converters, the wide scanf family, `glob` and `regcomp`/`regexec`, none of
+which it imports; 2 gcc-14 libstdc++ ids on its four packages, A-80's
+reason (checked on a `linux/arm64` build of the image's build stage at
+`0f3291f3`). `release image-scan` over grype 0.120.1 scans of the pinned
+base for both platforms reports every finding covered and every exception
+used. `the_committed_exceptions_name_owner_rows_and_cover_their_findings`
+now expects 71 entries, 44 naming A-80 and 27 naming A-95, and checks that
+each covers its finding on 2026-11-25 (the later row's date) and on
+2027-02-01.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
