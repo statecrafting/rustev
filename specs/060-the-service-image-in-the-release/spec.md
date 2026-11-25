@@ -632,6 +632,20 @@ now expects 71 entries, 44 naming A-80 and 27 naming A-95, and checks that
 each covers its finding on 2026-11-25 (the later row's date) and on
 2027-02-01.
 
+**Increment 8, 2026-11-25 (3.2.1, two more v0.8.0 findings).** The second
+`v0.8.0` release run (45650346355), at `5fac6d87`, failed `image checks` on
+two findings the vulnerability database built 2026-11-25 added after A-95:
+CVE-2026-84785 in `libssl3t64` and CVE-2026-124851 in `libzstd1`, on both
+platforms. The owner accepted both on 2026-11-25 (A-96).
+`tools/rustev-release/image-exceptions.json` gains 2 entries naming A-96 and
+expiring on 2027-02-01: not reached, because the binary links neither
+library and contains no zstd code. The newest base digest still ships the
+same `libzstd1`, so the base stays pinned. `release image-scan` over that
+day's grype 0.120.1 scans of the pinned base for both platforms reports
+every finding covered and every exception used.
+`the_committed_exceptions_name_owner_rows_and_cover_their_findings` now
+expects 73 entries: 44 naming A-80, 27 naming A-95 and 2 naming A-96.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
