@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 27
-# (identity 4dce5a037779c31a0f5dfb18ea1d47749102899d6231468ee8012801f3e9dd30). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 29
+# (identity 9d5bb0e25975598a07bcb7ed7f0466a25dd725508cd050dbdbbec6f4950dcebe). A managed file and a member of this
 # repository's authority set: an edit here changes the gate that judges every
 # pull request, and `statecraft doctor` names it. The policy the aggregate gate
 # enforces is .statecraft/setup/github-actions-rust.json, read at the base.
@@ -168,7 +168,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: sh "${STATECRAFT_GATE:?}" governance
-      # Revision 4, rule 3: the title and body become the merge commit's
+      # Revision 4, rule 3: the title and body become the landed commit's
       # message (governance.authored_content_text).
       - name: Authored-content rules (title and body)
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
